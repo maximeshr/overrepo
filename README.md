@@ -42,16 +42,16 @@ The project key is the path, relative to `root`. `root` is relative to the manif
 
 ## Commands
 
-| Command           | What it does                                                                                                                                                                                                                                        |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `init`            | Scans git repositories below the current directory (follows directory symlinks, skips `t3-*` directories and the directory you are in) and writes `overrepo.yaml`. Repositories without an `origin` are skipped. `--depth`, `--force`, `--dry-run`. |
-| `sync`            | Clones missing projects in parallel. `--pull` fetches and fast-forwards existing clones. `--dry-run`, `-j`, `--timeout`, `--retries`, `-q`, `--json`.                                                                                               |
-| `list` (`ls`)     | Lists projects (`●` cloned, `○` not cloned). `--json`, `--names`.                                                                                                                                                                                   |
-| `status` (`st`)   | Branch, ahead/behind, local changes. `--dirty`, `--json`.                                                                                                                                                                                           |
-| `context`         | Writes one summary per repository and an index, read from each clone's `origin/HEAD`. `--check` fails when a file is outdated and writes nothing. `--prune` deletes summaries of removed projects.                                                  |
-| `exec <command…>` | Runs a command in each selected project. Requires a selection.                                                                                                                                                                                      |
-| `import`          | Merges projects from JSON (stdin or `--file`) into a block-style `projects` map. `--sync` clones only the projects just added. `--overwrite`, `--prune`, `--dry-run`, `--json`.                                                                     |
-| `doctor`          | Checks git, remote access, the manifest, missing clones, orphan repositories and interrupted clones. The fleet root does not have to be a git. `--no-network`, `--json`.                                                                            |
+| Command           | What it does                                                                                                                                                                                                                 |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init`            | Scans git repositories below the current directory (follows directory symlinks, skips the directory you are in) and writes `overrepo.yaml`. Repositories without an `origin` are skipped. `--depth`, `--force`, `--dry-run`. |
+| `sync`            | Clones missing projects in parallel. `--pull` fetches and fast-forwards existing clones. `--dry-run`, `-j`, `--timeout`, `--retries`, `-q`, `--json`.                                                                        |
+| `list` (`ls`)     | Lists projects (`●` cloned, `○` not cloned). `--json`, `--names`.                                                                                                                                                            |
+| `status` (`st`)   | Branch, ahead/behind, local changes. `--dirty`, `--json`.                                                                                                                                                                    |
+| `context`         | Writes one summary per repository and an index, read from each clone's `origin/HEAD`. `--check` fails when a file is outdated and writes nothing. `--prune` deletes summaries of removed projects.                           |
+| `exec <command…>` | Runs a command in each selected project. Requires a selection.                                                                                                                                                               |
+| `import`          | Merges projects from JSON (stdin or `--file`) into a block-style `projects` map. `--sync` clones only the projects just added. `--overwrite`, `--prune`, `--dry-run`, `--json`.                                              |
+| `doctor`          | Checks git, remote access, the manifest, missing clones, orphan repositories and interrupted clones. The fleet root does not have to be a git. `--no-network`, `--json`.                                                     |
 
 Global options: `-C <dir>`, `-c <file>`, `-v`, `-h`.
 
