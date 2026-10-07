@@ -1,6 +1,6 @@
 ---
 objective: "Each fleet repository has a summary read from its remote default branch, written where the operator points."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Repository summaries
