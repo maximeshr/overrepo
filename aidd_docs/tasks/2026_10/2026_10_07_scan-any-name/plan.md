@@ -1,6 +1,6 @@
 ---
 objective: "A scanned repository is listed whatever its directory is named."
-status: in-progress
+status: implemented
 ---
 
 # Plan: Scan any repository name
