@@ -7,12 +7,13 @@ import { ManifestError, type ManifestIssue } from "./errors.ts";
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_RETRIES,
+  DEFAULT_SUMMARY,
   DEFAULT_TIMEOUT_SECONDS,
   MANIFEST_FILES,
   type Manifest,
   type Project,
 } from "./model.ts";
-import { normalizeRelativePath } from "./paths.ts";
+import { isInsideDir, normalizeRelativePath } from "./paths.ts";
 import { manifestSchema, type RawManifest } from "./schema.ts";
 
 export interface LocateOptions {
@@ -161,6 +162,26 @@ function resolveManifest(
   }
   const root = "error" in fleet ? manifestDir : fleet.root;
 
+  const outDirResult = normalizeRelativePath(raw.summary?.outDir ?? DEFAULT_SUMMARY.outDir);
+  const outDir =
+    "error" in outDirResult ? (raw.summary?.outDir ?? DEFAULT_SUMMARY.outDir) : outDirResult.path;
+  if ("error" in outDirResult) {
+    issues.push({
+      path: "summary.outDir",
+      message: outDirResult.error,
+      ...locate(["summary", "outDir"]),
+    });
+  }
+  const summary = {
+    outDir,
+    index: `${outDir}/index.md`,
+    include: [...DEFAULT_SUMMARY.include],
+    maxBytes: DEFAULT_SUMMARY.maxBytes,
+    readmeMaxChars: DEFAULT_SUMMARY.readmeMaxChars,
+    treeMaxEntries: DEFAULT_SUMMARY.treeMaxEntries,
+  };
+  const outDirAbs = path.resolve(manifestDir, ...outDir.split("/"));
+
   const projects: Project[] = [];
   const byPath = new Map<string, string>();
   for (const [name, project] of Object.entries(raw.projects)) {
@@ -184,10 +205,18 @@ function resolveManifest(
     } else {
       byPath.set(pathKey, projectPath);
     }
+    const projectDir = path.resolve(root, ...projectPath.split("/"));
+    if (!("error" in outDirResult) && isInsideDir(outDirAbs, projectDir)) {
+      issues.push({
+        path: `projects.${name}`,
+        message: `path must not be inside summary.outDir ("${outDir}")`,
+        ...locate(["projects", name]),
+      });
+    }
     projects.push({
       name: projectPath,
       path: projectPath,
-      dir: path.resolve(root, ...projectPath.split("/")),
+      dir: projectDir,
       url: project.url,
       desc: project.desc?.trim() || undefined,
       tags: [...new Set(project.tags ?? [])],
@@ -205,6 +234,7 @@ function resolveManifest(
       timeout: DEFAULT_TIMEOUT_SECONDS,
       retries: DEFAULT_RETRIES,
     },
+    summary,
     projects,
   };
 }

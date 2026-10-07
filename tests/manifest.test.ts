@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vite-plus/test";
 import { ManifestError } from "../src/core/errors.ts";
 import { parseManifest } from "../src/core/manifest.ts";
@@ -25,14 +26,15 @@ projects:
   frontend/web:
     url: git@github.com:client/web.git
 `);
-    expect(manifest.root).toBe("/meta");
-    expect(manifest.manifestDir).toBe("/meta");
+    expect(manifest.root).toBe(path.resolve("/meta"));
+    expect(manifest.manifestDir).toBe(path.resolve("/meta"));
+    expect(manifest.summary).toMatchObject({ outDir: "ai/repos", index: "ai/repos/index.md" });
     expect(manifest.defaults).toMatchObject({ concurrency: 8, retries: 2 });
     const [billing, web] = manifest.projects;
     expect(billing).toMatchObject({
       name: "backend/billing-api",
       path: "backend/billing-api",
-      dir: "/meta/backend/billing-api",
+      dir: path.resolve("/meta", ..."backend/billing-api".split("/")),
       url: "git@github.com:client/billing-api.git",
       tags: ["backend", "billing"],
       desc: "Billing API",
@@ -40,7 +42,7 @@ projects:
     expect(web).toMatchObject({
       name: "frontend/web",
       path: "frontend/web",
-      dir: "/meta/frontend/web",
+      dir: path.resolve("/meta", ..."frontend/web".split("/")),
     });
   });
 
@@ -48,6 +50,8 @@ projects:
     const manifest = parse(
       `
 root: ..
+summary:
+  outDir: aidd_docs/memory/internal
 projects:
   qualifio/collect/collect:
     url: git@gitlab.example:qualifioapp/collect/collect.git
@@ -55,12 +59,14 @@ projects:
 `,
       "/meta/workspace/overrepo.yaml",
     );
-    expect(manifest.root).toBe("/meta");
-    expect(manifest.manifestDir).toBe("/meta/workspace");
+    expect(manifest.root).toBe(path.resolve("/meta"));
+    expect(manifest.manifestDir).toBe(path.resolve("/meta/workspace"));
     expect(manifest.projects[0]).toMatchObject({
       path: "qualifio/collect/collect",
-      dir: "/meta/qualifio/collect/collect",
+      dir: path.resolve("/meta", ..."qualifio/collect/collect".split("/")),
     });
+    expect(manifest.summary.outDir).toBe("aidd_docs/memory/internal");
+    expect(manifest.summary.index).toBe("aidd_docs/memory/internal/index.md");
   });
 
   it("reports unknown keys with their YAML path and line", () => {

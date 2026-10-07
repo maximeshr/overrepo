@@ -190,7 +190,10 @@ describe("exec and status", () => {
       "--all",
       "-j",
       "4",
-      "echo hi; test $OVERREPO_PROJECT != frontend/web-3",
+      "--",
+      process.execPath,
+      "-e",
+      "console.log('hi'); if (process.env.OVERREPO_PROJECT === 'frontend/web-3') process.exit(1)",
     ]);
     expect(result.code).toBe(1);
     expect(result.stdout).toMatch(/^backend\/api-0 +│ hi$/m);
@@ -251,6 +254,61 @@ describe("meta-folder", () => {
     expect(doctor.code).toBe(0);
     const checks = JSON.parse(doctor.stdout).checks as Array<{ id: string; level: string }>;
     expect(checks.find((check) => check.id === "orphans")).toMatchObject({ level: "ok" });
+  });
+});
+
+describe("context", () => {
+  it("writes summaries from origin/HEAD next to the manifest and ignores a dirty tree", async () => {
+    const hub = tempDir("overrepo-summary-");
+    const workspace = path.join(hub, "workspace");
+    mkdirSync(workspace, { recursive: true });
+    const url = createRemote(tempDir("overrepo-summary-remotes-"), "collect", {
+      "README.md": "# collect\n\ncommitted body\n",
+      "package.json": JSON.stringify({ name: "collect", scripts: { test: "echo ok" } }),
+    });
+    writeFileSync(
+      path.join(workspace, "overrepo.yaml"),
+      [
+        "root: ..",
+        "summary:",
+        "  outDir: aidd_docs/memory/internal",
+        "projects:",
+        "  qualifio/collect/collect:",
+        `    url: ${url}`,
+        "    tags: [collect]",
+        "    desc: Collect",
+        "",
+      ].join("\n"),
+    );
+    const args = ["-c", "workspace/overrepo.yaml"];
+    expect((await cli(hub, [...args, "sync", "--tags", "collect"])).code).toBe(0);
+    const clone = path.join(hub, "qualifio/collect/collect");
+    writeFileSync(path.join(clone, "README.md"), "# collect\n\nDIRTY body\n");
+
+    expect((await cli(hub, [...args, "context"])).code).toBe(0);
+    const card = path.join(workspace, "aidd_docs/memory/internal/qualifio/collect/collect.md");
+    const index = path.join(workspace, "aidd_docs/memory/internal/index.md");
+    expect(existsSync(index)).toBe(true);
+    const text = readFileSync(card, "utf8");
+    expect(text).toContain("committed body");
+    expect(text).not.toContain("DIRTY");
+    expect(text).toContain("Collect");
+
+    const again = await cli(hub, [...args, "context", "--json"]);
+    expect(again.code).toBe(0);
+    expect(
+      JSON.parse(again.stdout).files.every(
+        (file: { status: string }) => file.status === "unchanged",
+      ),
+    ).toBe(true);
+    expect((await cli(hub, [...args, "context", "--check"])).code).toBe(0);
+
+    writeFileSync(card, text.replace("Collect", "Changed"));
+    expect((await cli(hub, [...args, "context", "--check"])).code).toBe(1);
+    expect(readFileSync(card, "utf8")).toContain("Changed");
+    expect(
+      (await cli(hub, [...args, "exec", "--tags", "collect", "--", "git", "status", "-s"])).code,
+    ).toBe(0);
   });
 });
 
@@ -387,7 +445,7 @@ describe("cli", () => {
     const help = await cli(tempDir(), ["--help"]);
     expect(help.stdout).toContain("Usage: overrepo");
     expect(help.stdout).toContain("sync");
-    expect(help.stdout).not.toMatch(/\bcontext\b/);
+    expect(help.stdout).toMatch(/\bcontext\b/);
     expect(help.stdout).not.toMatch(/\n {2}run\b/);
     expect((await cli(tempDir(), ["--version"])).stdout).toMatch(/^\d+\.\d+\.\d+/);
     expect((await cli(tempDir(), ["list"])).code).toBe(2);
