@@ -26,8 +26,9 @@ jobs:
       - run: vp test
       - uses: changesets/action@v2.1.2
         with:
-          version: vp exec changeset version
-          publish: vp run release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version-script: vp exec changeset version
+          publish-script: vp run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
