@@ -4,9 +4,7 @@ import path from "node:path";
 import { PARTIAL_SUFFIX } from "./model.ts";
 import { toPosixRelative } from "./paths.ts";
 
-const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target"]);
-/** T3 worktrees live next to a checkout (`t3-<id>`). They are not leaf repositories. */
-const T3_WORKTREE = /^t3-/;
+const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target"]);;
 
 export interface ScanOptions {
   /** Maximum directory depth below root (root = 0). */
@@ -57,13 +55,7 @@ export async function scanRepos(root: string, options: ScanOptions = {}): Promis
         if (partial) result.partials.push(toPosixRelative(root, partial));
         continue;
       }
-      if (
-        entry.name.startsWith(".") ||
-        SKIPPED_DIRS.has(entry.name) ||
-        T3_WORKTREE.test(entry.name)
-      ) {
-        continue;
-      }
+      if (entry.name.startsWith(".") || SKIPPED_DIRS.has(entry.name)) continue;
       const child = await directoryChild(dir, entry);
       if (!child) continue;
       const relative = toPosixRelative(root, child);

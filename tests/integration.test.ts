@@ -128,7 +128,7 @@ describe("init", () => {
     expect((await cli(fresh, ["init"])).code).toBe(2);
   });
 
-  it("follows directory symlinks and skips the scan root and t3 worktrees", async () => {
+  it("follows directory symlinks and skips the scan root", async () => {
     const hub = tempDir("overrepo-scan-");
     git(hub, "init", "-q");
     const real = tempDir("overrepo-real-");
@@ -139,15 +139,16 @@ describe("init", () => {
     git(real, "remote", "add", "origin", "file:///collect.git");
     mkdirSync(path.join(hub, "qualifio"), { recursive: true });
     symlinkSync(real, path.join(hub, "qualifio", "collect"), "dir");
-    const worktree = path.join(hub, "t3-abc");
-    mkdirSync(worktree, { recursive: true });
-    git(worktree, "init", "-q");
+    const named = path.join(hub, "t3-abc");
+    mkdirSync(named, { recursive: true });
+    git(named, "init", "-q");
+    git(named, "remote", "add", "origin", "file:///t3-abc.git");
 
     const init = await cli(hub, ["init", "--dry-run"]);
     expect(init.code).toBe(0);
     expect(init.stdout).toContain("qualifio/collect:");
     expect(init.stdout).toContain("url: file:///collect.git");
-    expect(init.stdout).not.toContain("t3-abc");
+    expect(init.stdout).toContain("t3-abc:");
     expect(init.stdout).not.toMatch(/^ {2}\.:/m);
   });
 });
