@@ -1,23 +1,32 @@
 import path from "node:path";
 
 /**
- * Normalizes a manifest-relative path to POSIX form (`backend/billing-api`).
- * Returns an error message instead when the path is absolute, empty or escapes the root.
+ * Normalizes a path relative to the fleet root (`qualifio/collect/collect`).
+ * Returns an error message when the path is absolute, empty, or leaves the root.
  */
 export function normalizeRelativePath(input: string): { path: string } | { error: string } {
   const slashed = input.trim().replaceAll("\\", "/");
   if (slashed === "") return { error: "path must not be empty" };
   if (slashed.startsWith("/") || /^[A-Za-z]:\//.test(slashed) || path.isAbsolute(input)) {
-    return { error: `path must be relative to the manifest root, got "${input}"` };
+    return { error: `path must be relative to the fleet root, got "${input}"` };
   }
   const normalized = path.posix.normalize(slashed).replace(/\/+$/, "");
   if (normalized === "." || normalized === "") {
-    return { error: "path must not point to the manifest root itself" };
+    return { error: "path must not point to the fleet root itself" };
   }
   if (normalized === ".." || normalized.startsWith("../")) {
-    return { error: `path "${input}" escapes the manifest root` };
+    return { error: `path "${input}" escapes the fleet root` };
   }
   return { path: normalized };
+}
+
+/** True when `absolute` is `parent` or a directory inside it. */
+export function isInsideDir(parent: string, absolute: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(absolute));
+  return (
+    relative === "" ||
+    (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
+  );
 }
 
 /** `a/b/c` is inside `a/b` (or equal to it). */

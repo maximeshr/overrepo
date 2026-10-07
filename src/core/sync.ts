@@ -2,13 +2,11 @@ import { mkdir, readdir, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { clone, fetch, isDirectory, isGitRepo, pullFastForward, repoStatus } from "../git/git.ts";
 import { withRetry } from "../git/retry.ts";
-import { PARTIAL_SUFFIX, syncGitignore, type GitignoreUpdate } from "./gitignore.ts";
-import type { Manifest, Project } from "./model.ts";
+import { PARTIAL_SUFFIX, type Manifest, type Project } from "./model.ts";
 import {
   failed,
   forEachProject,
   ok,
-  skipped,
   type Outcome,
   type ProjectResult,
   type RunEvent,
@@ -32,8 +30,6 @@ export interface SyncOptions {
 
 export interface SyncReport {
   results: ProjectResult<SyncAction>[];
-  /** `undefined` when `gitignore.sync` is disabled. */
-  gitignore: GitignoreUpdate | undefined;
 }
 
 export function partialCloneDir(project: Project): string {
@@ -50,22 +46,13 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
   const retries = options.retries ?? manifest.defaults.retries;
   const signal = options.signal;
 
-  // The ignore block covers every project of the manifest, whatever the selection, before anything is cloned.
-  const gitignore = manifest.gitignore.sync
-    ? await syncGitignore(
-        manifest.root,
-        manifest.projects.map((project) => project.path),
-        { dryRun: options.dryRun },
-      )
-    : undefined;
-
-  const cloneProject = async (project: Project, url: string): Promise<Outcome<SyncAction>> => {
+  const cloneProject = async (project: Project): Promise<Outcome<SyncAction>> => {
     if (options.dryRun) return ok("would clone", "would-clone");
     const partial = partialCloneDir(project);
     await mkdir(path.dirname(project.dir), { recursive: true });
     await rm(partial, { recursive: true, force: true });
     try {
-      await withRetry(() => clone(url, partial, project.clone, { timeout, signal }), {
+      await withRetry(() => clone(project.url, partial, { timeout, signal }), {
         retries,
         signal,
         onRetry: () => rm(partial, { recursive: true, force: true }),
@@ -76,7 +63,7 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
       await rm(partial, { recursive: true, force: true }).catch(() => undefined);
       throw error;
     }
-    return ok(`cloned${project.clone.branch ? ` (${project.clone.branch})` : ""}`, "cloned");
+    return ok("cloned", "cloned");
   };
 
   const updateProject = async (project: Project): Promise<Outcome<SyncAction>> => {
@@ -102,9 +89,7 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
       if (isDirectory(project.dir) && !(await isEmptyDir(project.dir))) {
         return failed("directory exists but is not a git repository");
       }
-      if (!project.sync) return skipped("sync: false");
-      if (!project.url) return skipped("no url");
-      return cloneProject(project, project.url);
+      return cloneProject(project);
     },
     {
       concurrency: options.concurrency ?? manifest.defaults.concurrency,
@@ -113,5 +98,5 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
     },
   );
 
-  return { results, gitignore };
+  return { results };
 }

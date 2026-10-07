@@ -8,7 +8,7 @@ import { normalizeGitUrl } from "./urls.ts";
 
 /**
  * Import format (JSON). Either an array of projects or `{ "projects": [...] }`.
- * Unknown fields are ignored so discovery scripts can emit extra metadata.
+ * `name` is the project path (the manifest key). Unknown fields are ignored.
  */
 export const importProjectSchema = z.object({
   name: z
@@ -19,9 +19,6 @@ export const importProjectSchema = z.object({
   url: z.string().min(1).optional(),
   desc: z.string().optional(),
   tags: z.array(z.string().regex(/^[^\s,]+$/)).optional(),
-  owners: z.array(z.string().min(1)).optional(),
-  links: z.record(z.string(), z.string().min(1)).optional(),
-  sync: z.boolean().optional(),
 });
 
 export const importSourceSchema = z.union([
@@ -50,7 +47,7 @@ export interface ImportReport {
   text: string;
 }
 
-const FIELDS = ["path", "url", "desc", "tags", "owners", "links", "sync"] as const;
+const FIELDS = ["url", "desc", "tags"] as const;
 
 export function parseImportSource(json: string): ImportProject[] {
   let data: unknown;
@@ -69,6 +66,12 @@ export function parseImportSource(json: string): ImportProject[] {
   const projects = Array.isArray(result.data) ? result.data : result.data.projects;
   const seen = new Set<string>();
   for (const project of projects) {
+    if (project.path !== undefined && project.path !== project.name) {
+      throw new OverrepoError(
+        `import: "${project.name}" is the path; got a different path "${project.path}"`,
+        2,
+      );
+    }
     if (seen.has(project.name))
       throw new OverrepoError(`import: duplicate project name "${project.name}"`, 2);
     seen.add(project.name);
@@ -82,8 +85,13 @@ function sameValue(a: unknown, b: unknown): boolean {
 
 function projectsMap(doc: Document): YAMLMap {
   const projects = doc.get("projects", true);
-  if (isMap(projects)) return projects;
+  if (isMap(projects)) {
+    // A flow map (`projects: {}`) inlines every project onto one line.
+    projects.flow = false;
+    return projects;
+  }
   const created = new YAMLMap();
+  created.flow = false;
   created.spaceBefore = true;
   doc.set("projects", created);
   return created;
@@ -101,19 +109,13 @@ export async function importProjects(
   incoming: ImportProject[],
   options: ImportOptions = {},
 ): Promise<ImportReport> {
-  if (manifest.format === "mani") {
-    throw new OverrepoError(
-      "import does not write mani.yaml; convert it first with `overrepo init --from-mani`",
-      2,
-    );
-  }
   const original = await readFile(manifest.file, "utf8");
   const { doc } = parseManifestDocument(original, manifest.file);
   const projects = projectsMap(doc);
 
   const byUrl = new Map<string, string>();
   for (const project of manifest.projects) {
-    const key = project.url && normalizeGitUrl(project.url);
+    const key = normalizeGitUrl(project.url);
     if (key) byUrl.set(key, project.name);
   }
   const known = new Set(manifest.projects.map((project) => project.name));
@@ -133,6 +135,7 @@ export async function importProjects(
     const target = known.has(source.name) ? source.name : urlKey ? byUrl.get(urlKey) : undefined;
 
     if (target === undefined) {
+      if (!source.url) throw new OverrepoError(`import: project "${source.name}" needs a url`, 2);
       const node = new YAMLMap();
       for (const field of FIELDS)
         if (source[field] !== undefined) setField(doc, node, field, source[field]);
@@ -176,9 +179,8 @@ export async function importProjects(
   report.text = text;
   report.changed = text !== original;
 
-  // Validate the merged result before touching the file.
   try {
-    parseManifest(text, manifest.file, "overrepo");
+    parseManifest(text, manifest.file);
   } catch (error) {
     if (error instanceof ManifestError)
       throw new OverrepoError(

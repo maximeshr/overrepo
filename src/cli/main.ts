@@ -1,9 +1,8 @@
 import { Command, CommanderError } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import { OverrepoError } from "../core/errors.ts";
-import { registerContext } from "./commands/context.ts";
 import { registerDoctor } from "./commands/doctor.ts";
-import { registerExec, registerRun } from "./commands/exec.ts";
+import { registerExec } from "./commands/exec.ts";
 import { registerImport } from "./commands/import.ts";
 import { registerInit } from "./commands/init.ts";
 import { registerList } from "./commands/list.ts";
@@ -21,15 +20,10 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     };
 
   const program = new Command("overrepo")
-    .description(
-      "Manage a fleet of git repositories from a manifest, and make the meta-repo readable by AI agents.",
-    )
+    .description("Manage a fleet of git repositories from one manifest.")
     .version(pkg.version, "-v, --version")
     .option("-C, --cwd <dir>", "run as if started in <dir>")
-    .option(
-      "-c, --config <file>",
-      "manifest file (default: overrepo.yaml or mani.yaml, searched upwards)",
-    )
+    .option("-c, --config <file>", "manifest file (default: overrepo.yaml, searched upwards)")
     .enablePositionalOptions()
     .showHelpAfterError("(run with --help for usage)")
     .exitOverride()
@@ -45,8 +39,6 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     registerList,
     registerStatus,
     registerExec,
-    registerRun,
-    registerContext,
     registerImport,
     registerDoctor,
   ]) {

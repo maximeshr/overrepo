@@ -1,6 +1,6 @@
 /**
  * Programmatic API. Everything here is free of console I/O so it can back other
- * front-ends (e.g. an MCP server) as well as the `overrepo` CLI.
+ * front-ends as well as the `overrepo` CLI.
  */
 export { ManifestError, OverrepoError, UsageError, type ManifestIssue } from "./core/errors.ts";
 export {
@@ -10,15 +10,7 @@ export {
   type LocateOptions,
   type ManifestLocation,
 } from "./core/manifest.ts";
-export type {
-  CloneOptions,
-  ContextConfig,
-  Defaults,
-  Manifest,
-  ManifestFormat,
-  Project,
-  Task,
-} from "./core/model.ts";
+export type { Defaults, Manifest, Project } from "./core/model.ts";
 export { manifestSchema } from "./core/schema.ts";
 export {
   selectProjects,
@@ -53,16 +45,4 @@ export {
   type DoctorOptions,
   type DoctorReport,
 } from "./core/doctor.ts";
-export { syncGitignore, updateGitignoreContent } from "./core/gitignore.ts";
 export { normalizeGitUrl } from "./core/urls.ts";
-export {
-  generateContext,
-  cardPath,
-  type ContextFile,
-  type ContextOptions,
-  type ContextReport,
-  type FileStatus,
-} from "./context/generate.ts";
-export { analyzeProject, type Analysis } from "./context/analyze.ts";
-export { defaultDetectors } from "./context/detectors/index.ts";
-export type { Detection, Detector, PackageId, RepoFiles, Script } from "./context/types.ts";

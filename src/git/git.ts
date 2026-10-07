@@ -2,7 +2,6 @@ import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { execa } from "execa";
 import { OverrepoError } from "../core/errors.ts";
-import type { CloneOptions } from "../core/model.ts";
 
 export interface GitRunOptions {
   cwd?: string;
@@ -121,18 +120,9 @@ export function isDirectory(dir: string): boolean {
   }
 }
 
-export async function clone(
-  url: string,
-  dest: string,
-  clone: CloneOptions,
-  options: GitRunOptions = {},
-): Promise<void> {
-  const args = ["clone", "--no-progress"];
-  if (clone.branch) args.push("--branch", clone.branch);
-  if (clone.depth) args.push("--depth", String(clone.depth));
-  if (clone.filter) args.push(`--filter=${clone.filter}`);
-  args.push("--", url, dest);
-  await git(args, options);
+/** Clones the remote default branch. Blobs are fetched on demand. */
+export async function clone(url: string, dest: string, options: GitRunOptions = {}): Promise<void> {
+  await git(["clone", "--no-progress", "--filter=blob:none", "--", url, dest], options);
 }
 
 export async function originUrl(
@@ -205,23 +195,4 @@ export async function pullFastForward(dir: string, options: GitRunOptions = {}):
 
 export async function lsRemote(url: string, options: GitRunOptions = {}): Promise<void> {
   await git(["ls-remote", "--exit-code", "--heads", url], options);
-}
-
-/** Top-level tracked entries of HEAD (`dirs` end with `/`), or `undefined` when there is no commit. */
-export async function trackedTopLevel(
-  dir: string,
-  options: GitRunOptions = {},
-): Promise<string[] | undefined> {
-  try {
-    const output = await git(["ls-tree", "-z", "HEAD"], { ...options, cwd: dir });
-    return output
-      .split("\0")
-      .filter(Boolean)
-      .map((line) => {
-        const [meta = "", name = ""] = line.split("\t");
-        return meta.split(" ")[1] === "tree" ? `${name}/` : name;
-      });
-  } catch {
-    return undefined;
-  }
 }

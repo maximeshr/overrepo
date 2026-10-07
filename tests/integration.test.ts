@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vite-plus/test";
-import { cli, createRemote, git, tempDir, writeFiles } from "./helpers.ts";
+import { cli, createRemote, git, tempDir } from "./helpers.ts";
 
-/** Meta-repo with remotes for backend/frontend projects. */
+/** Fleet whose manifest sits in the same directory as the clones. */
 function setupWorkspace(projectCount = 4) {
   const remotes = tempDir("overrepo-remotes-");
   const root = tempDir("overrepo-meta-");
@@ -12,43 +12,35 @@ function setupWorkspace(projectCount = 4) {
   for (let index = 0; index < projectCount; index++) {
     const backend = index % 2 === 0;
     const name = `${backend ? "api" : "web"}-${index}`;
+    const dir = `${backend ? "backend" : "frontend"}/${name}`;
     const url = createRemote(remotes, name, {
-      "README.md": `# ${name}\n\nService number ${index}.\n\n## Usage\n\nRun it.\n`,
-      "package.json": JSON.stringify({
-        name: `@client/${name}`,
-        scripts: { test: "echo ok" },
-        dependencies: index === 1 ? { "@client/api-0": "^1.0.0" } : {},
-      }),
-      "src/index.js": "export {};\n",
+      "README.md": `# ${name}\n`,
+      "package.json": JSON.stringify({ name: `@client/${name}`, description: `Project ${index}` }),
     });
     projects.push(
-      `  ${name}:\n    path: ${backend ? "backend" : "frontend"}/${name}\n    url: ${url}\n    desc: Project ${index}\n    tags: [${backend ? "backend" : "frontend"}, node]\n`,
+      `  ${dir}:\n    url: ${url}\n    desc: Project ${index}\n    tags: [${backend ? "backend" : "frontend"}, node]\n`,
     );
   }
-  writeFileSync(
-    path.join(root, "overrepo.yaml"),
-    `# shared meta-repo manifest\nversion: 1\ndefaults:\n  concurrency: 4\n  retries: 0\nprojects:\n${projects.join("")}tasks:\n  hello:\n    desc: Say hello\n    cmd: echo hello from $OVERREPO_PROJECT\n`,
-  );
-  writeFileSync(path.join(root, ".gitignore"), "node_modules\n# keep me\n");
+  writeFileSync(path.join(root, "overrepo.yaml"), `projects:\n${projects.join("")}`);
   return { root, remotes };
 }
 
 describe("sync", () => {
-  it("clones everything in parallel, reports an unreachable repo without failing the others", async () => {
+  it("clones everything in parallel and reports an unreachable repo without failing the others", async () => {
     const { root, remotes } = setupWorkspace(12);
     const manifest = readFileSync(path.join(root, "overrepo.yaml"), "utf8");
     writeFileSync(
       path.join(root, "overrepo.yaml"),
       manifest.replace(
         "projects:\n",
-        `projects:\n  ghost:\n    path: backend/ghost\n    url: file://${remotes}/does-not-exist.git\n  listed:\n    path: misc/listed\n    url: file://${remotes}/nope.git\n    sync: false\n`,
+        `projects:\n  backend/ghost:\n    url: file://${remotes}/does-not-exist.git\n`,
       ),
     );
 
     const result = await cli(root, ["sync"]);
     expect(result.code).toBe(1);
-    expect(result.stderr).toMatch(/ghost/);
-    expect(result.stderr).toMatch(/12 ok, 1 failed, 1 skipped/);
+    expect(result.stderr).toMatch(/backend\/ghost/);
+    expect(result.stderr).toMatch(/12 ok, 1 failed, 0 skipped/);
     for (let index = 0; index < 12; index++) {
       const dir = path.join(
         root,
@@ -59,22 +51,8 @@ describe("sync", () => {
     }
     expect(existsSync(path.join(root, "backend/ghost"))).toBe(false);
     expect(existsSync(path.join(root, "backend/.ghost.overrepo-partial"))).toBe(false);
-    expect(existsSync(path.join(root, "misc/listed"))).toBe(false);
 
-    const gitignore = readFileSync(path.join(root, ".gitignore"), "utf8");
-    expect(gitignore.startsWith("node_modules\n# keep me\n\n# >>> overrepo (managed) >>>\n")).toBe(
-      true,
-    );
-    expect(gitignore).toContain("/backend/api-0/\n");
-    expect(gitignore).toContain("/misc/listed/\n");
-    // The meta-repo sees no untracked project directories.
-    expect(
-      git(root, "status", "--porcelain", "--untracked-files=all")
-        .split("\n")
-        .filter((line) => line.includes("backend/api")),
-    ).toEqual([]);
-
-    const again = await cli(root, ["sync", "--json", "--projects", "api-0,web-1"]);
+    const again = await cli(root, ["sync", "--json", "--projects", "backend/api-0,frontend/web-1"]);
     expect(again.code).toBe(0);
     expect(
       JSON.parse(again.stdout).results.map((entry: { action: string }) => entry.action),
@@ -91,7 +69,10 @@ describe("sync", () => {
 
     const result = await cli(root, ["sync", "--pull", "--json"]);
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout).results[0]).toMatchObject({ name: "api-0", action: "pulled" });
+    expect(JSON.parse(result.stdout).results[0]).toMatchObject({
+      path: "backend/api-0",
+      action: "pulled",
+    });
     expect(existsSync(path.join(root, "backend/api-0/NEW.md"))).toBe(true);
   });
 
@@ -101,12 +82,11 @@ describe("sync", () => {
     expect(result.code).toBe(0);
     expect(result.stderr).toMatch(/would clone/);
     expect(existsSync(path.join(root, "backend"))).toBe(false);
-    expect(readFileSync(path.join(root, ".gitignore"), "utf8")).toBe("node_modules\n# keep me\n");
   });
 });
 
 describe("init", () => {
-  it("builds a valid manifest from existing clones; sync then clones nothing", async () => {
+  it("builds a manifest from clones that have an origin", async () => {
     const { root } = setupWorkspace(4);
     await cli(root, ["sync"]);
     const fresh = tempDir("overrepo-init-");
@@ -120,50 +100,59 @@ describe("init", () => {
         path.basename(dir),
       );
     }
-    // A local repo without remote is still listed.
     mkdirSync(path.join(fresh, "tools/local"), { recursive: true });
     git(path.join(fresh, "tools/local"), "init", "-q");
 
     const init = await cli(fresh, ["init"]);
     expect(init.code).toBe(0);
-    expect(init.stderr).toMatch(/3 project/);
+    expect(init.stderr).toMatch(/2 project/);
+    expect(init.stderr).toMatch(/tools\/local: no "origin" remote, skipped/);
     const text = readFileSync(path.join(fresh, "overrepo.yaml"), "utf8");
-    expect(text).toMatch(/api-0:\n {4}path: backend\/api-0\n {4}url: .+\n {4}tags: \[ backend \]/);
+    expect(text).toMatch(
+      /backend\/api-0:\n {4}url: .+\n {4}desc: Project 0\n {4}tags: \[ backend \]/,
+    );
+    expect(text).not.toContain("tools/local");
 
     const list = JSON.parse((await cli(fresh, ["list", "--json"])).stdout) as Array<{
-      name: string;
+      path: string;
       cloned: boolean;
     }>;
-    expect(list.map((project) => project.name)).toEqual(["api-0", "web-1", "local"]);
+    expect(list.map((project) => project.path)).toEqual(["backend/api-0", "frontend/web-1"]);
 
     const sync = await cli(fresh, ["sync", "--json"]);
     expect(sync.code).toBe(0);
     expect(
       JSON.parse(sync.stdout).results.map((entry: { action: string }) => entry.action),
-    ).toEqual(["present", "present", "present"]);
+    ).toEqual(["present", "present"]);
 
     expect((await cli(fresh, ["init"])).code).toBe(2);
   });
 
-  it("converts mani.yaml with --from-mani and reads mani.yaml as-is", async () => {
-    const root = tempDir("overrepo-mani-");
-    const mani =
-      "projects:\n  api:\n    path: backend/api\n    url: git@example.com:client/api.git\n    tags: [backend]\ntasks:\n  hello: echo hello\n";
-    writeFileSync(path.join(root, "mani.yaml"), mani);
+  it("follows directory symlinks and skips the scan root and t3 worktrees", async () => {
+    const hub = tempDir("overrepo-scan-");
+    git(hub, "init", "-q");
+    const real = tempDir("overrepo-real-");
+    writeFileSync(path.join(real, "README.md"), "# collect\n");
+    git(real, "init", "-q");
+    git(real, "add", "-A");
+    git(real, "commit", "-q", "-m", "init");
+    git(real, "remote", "add", "origin", "file:///collect.git");
+    mkdirSync(path.join(hub, "qualifio"), { recursive: true });
+    symlinkSync(real, path.join(hub, "qualifio", "collect"), "dir");
+    const worktree = path.join(hub, "t3-abc");
+    mkdirSync(worktree, { recursive: true });
+    git(worktree, "init", "-q");
 
-    const listed = await cli(root, ["list", "--names"]);
-    expect(listed).toMatchObject({ code: 0, stdout: "api\n" });
-    expect(readFileSync(path.join(root, "mani.yaml"), "utf8")).toBe(mani);
-
-    expect((await cli(root, ["init", "--from-mani"])).code).toBe(0);
-    const converted = readFileSync(path.join(root, "overrepo.yaml"), "utf8");
-    expect(converted).toContain("backend/api");
-    expect(converted).toContain("hello: echo hello");
-    expect(readFileSync(path.join(root, "mani.yaml"), "utf8")).toBe(mani);
+    const init = await cli(hub, ["init", "--dry-run"]);
+    expect(init.code).toBe(0);
+    expect(init.stdout).toContain("qualifio/collect:");
+    expect(init.stdout).toContain("url: file:///collect.git");
+    expect(init.stdout).not.toContain("t3-abc");
+    expect(init.stdout).not.toMatch(/^ {2}\.:/m);
   });
 });
 
-describe("exec, run, status", () => {
+describe("exec and status", () => {
   let root: string;
   beforeAll(async () => {
     ({ root } = setupWorkspace(4));
@@ -190,7 +179,7 @@ describe("exec, run, status", () => {
     ]);
     expect(result.code).toBe(0);
     const entries = JSON.parse(result.stdout) as Array<{ name: string; stdout: string }>;
-    expect(entries.map((entry) => entry.name)).toEqual(["api-0", "api-2"]);
+    expect(entries.map((entry) => entry.name)).toEqual(["backend/api-0", "backend/api-2"]);
     expect(entries[0]?.stdout).toBe("?? dirty.txt");
   });
 
@@ -200,22 +189,12 @@ describe("exec, run, status", () => {
       "--all",
       "-j",
       "4",
-      "echo hi; test $OVERREPO_PROJECT != web-3",
+      "echo hi; test $OVERREPO_PROJECT != frontend/web-3",
     ]);
     expect(result.code).toBe(1);
-    expect(result.stdout).toMatch(/^api-0 +│ hi$/m);
-    expect(result.stderr).toMatch(/web-3 .*exit code 1/);
+    expect(result.stdout).toMatch(/^backend\/api-0 +│ hi$/m);
+    expect(result.stderr).toMatch(/frontend\/web-3 .*exit code 1/);
     expect(result.stderr).toMatch(/3 ok, 1 failed, 0 skipped/);
-  });
-
-  it("runs manifest tasks", async () => {
-    const result = await cli(root, ["run", "hello", "--paths", "frontend", "--output", "grouped"]);
-    expect(result.code).toBe(0);
-    expect(result.stdout).toContain("hello from web-1");
-    expect(result.stdout).toContain("hello from web-3");
-    expect(result.stdout).not.toContain("api-0");
-    expect((await cli(root, ["run", "nope", "--all"])).code).toBe(2);
-    expect((await cli(root, ["run"])).stdout).toMatch(/hello +Say hello/);
   });
 
   it("reports aggregated status", async () => {
@@ -223,7 +202,7 @@ describe("exec, run, status", () => {
     expect(result.code).toBe(0);
     const entries = JSON.parse(result.stdout) as Array<Record<string, unknown>>;
     expect(entries[0]).toMatchObject({
-      name: "api-0",
+      name: "backend/api-0",
       state: "present",
       branch: "main",
       upstream: "origin/main",
@@ -231,108 +210,46 @@ describe("exec, run, status", () => {
       behind: 0,
       dirty: true,
     });
-    expect(entries[1]).toMatchObject({ name: "web-1", dirty: false });
+    expect(entries[1]).toMatchObject({ name: "frontend/web-1", dirty: false });
   });
 });
 
-describe("context", () => {
-  it("generates index and cards idempotently, preserves manual notes, detects staleness", async () => {
-    const { root } = setupWorkspace(4);
-    const manifestPath = path.join(root, "overrepo.yaml");
-    writeFileSync(
-      manifestPath,
-      readFileSync(manifestPath, "utf8").replace("  web-3:\n", "  web-3:\n    sync: false\n"),
-    );
-    await cli(root, ["sync"]);
-    writeFiles(path.join(root, "backend/api-0"), { "AGENTS.md": "# rules\n" });
-    git(path.join(root, "backend/api-0"), "add", "-A");
-    git(path.join(root, "backend/api-0"), "commit", "-q", "-m", "agents");
-
-    const first = await cli(root, ["context"]);
-    expect(first.code).toBe(0);
-    const index = readFileSync(path.join(root, "ai/repos/index.md"), "utf8");
-    expect(index).toContain(
-      "| [api-0](backend/api-0.md) | `backend/api-0/` | Project 0 | backend, node |",
-    );
-    expect(index).toMatch(/## backend\n/);
-    expect(index).toMatch(/## frontend\n/);
-
-    const cardFile = path.join(root, "ai/repos/backend/api-0.md");
-    const card = readFileSync(cardFile, "utf8");
-    expect(card).toMatch(/^---\nname: api-0\npath: backend\/api-0\n/);
-    expect(card).toContain("- [AGENTS.md](../../../backend/api-0/AGENTS.md)");
-    expect(card).toContain("**Languages:** JavaScript");
-    expect(card).toContain("- `npm run test` — `echo ok`");
-    expect(card).toContain(
-      "Used by:\n\n- [web-1](../frontend/web-1.md) — npm package `@client/api-0`",
-    );
-    expect(card).toContain("```text\nsrc/\nAGENTS.md\nREADME.md\npackage.json\n```");
-    expect(card).toContain("## README (excerpt)\n\nService number 0.\n\n#### Usage");
-    expect(card).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
-    expect(readFileSync(path.join(root, "ai/repos/frontend/web-3.md"), "utf8")).toContain(
-      "**Not cloned locally.**",
-    );
-
-    const second = await cli(root, ["context", "--json"]);
-    expect(
-      JSON.parse(second.stdout).files.every(
-        (file: { status: string }) => file.status === "unchanged",
-      ),
-    ).toBe(true);
-    expect((await cli(root, ["context", "--check"])).code).toBe(0);
-
-    writeFileSync(
-      cardFile,
-      card.replace(
-        "<!-- Human notes go here: this block is kept as-is when the file is regenerated. -->",
-        "Deploys on Fridays are forbidden.",
-      ),
-    );
-    writeFileSync(
-      manifestPath,
-      readFileSync(manifestPath, "utf8").replace("desc: Project 0", "desc: Billing API"),
-    );
-    const check = await cli(root, ["context", "--check"]);
-    expect(check.code).toBe(1);
-    expect(check.stderr).toContain("stale ai/repos/backend/api-0.md");
-
-    expect((await cli(root, ["context"])).code).toBe(0);
-    const regenerated = readFileSync(cardFile, "utf8");
-    expect(regenerated).toContain("Billing API");
-    expect(regenerated).toContain(
-      "<!-- overrepo:manual -->\nDeploys on Fridays are forbidden.\n<!-- /overrepo:manual -->",
-    );
-    expect((await cli(root, ["context", "--check"])).code).toBe(0);
-
-    // Orphan cards are reported, then pruned on request.
-    writeFileSync(
-      manifestPath,
-      readFileSync(manifestPath, "utf8").replace(/ {2}web-3:\n(?: {4}.*\n)+/, ""),
-    );
-    expect((await cli(root, ["context", "--check"])).code).toBe(1);
-    const pruned = await cli(root, ["context", "--prune"]);
-    expect(pruned.stderr).toContain("removed ai/repos/frontend/web-3.md");
-    expect(existsSync(path.join(root, "ai/repos/frontend/web-3.md"))).toBe(false);
-  });
-
-  it("bounds the card size", async () => {
-    const { root } = setupWorkspace(1);
-    writeFileSync(
-      path.join(root, "overrepo.yaml"),
-      readFileSync(path.join(root, "overrepo.yaml"), "utf8").replace(
-        "defaults:",
-        "context:\n  maxBytes: 2000\ndefaults:",
-      ),
-    );
-    await cli(root, ["sync"]);
-    writeFiles(path.join(root, "backend/api-0"), {
-      "README.md": `# api\n\n${"Lorem ipsum dolor sit amet. ".repeat(400)}\n`,
+describe("meta-folder", () => {
+  it("clones beside the manifest and does not write a gitignore", async () => {
+    const hub = tempDir("overrepo-hub-");
+    const workspace = path.join(hub, "workspace");
+    mkdirSync(workspace, { recursive: true });
+    git(workspace, "init", "-q");
+    const url = createRemote(tempDir("overrepo-hub-remotes-"), "collect", {
+      "README.md": "# collect\n",
     });
-    await cli(root, ["context"]);
-    const card = readFileSync(path.join(root, "ai/repos/backend/api-0.md"), "utf8");
-    const generated = card.slice(0, card.indexOf("<!-- overrepo:manual -->"));
-    expect(Buffer.byteLength(generated)).toBeLessThanOrEqual(2002);
-    expect(card).toContain("<!-- /overrepo:manual -->");
+    writeFileSync(
+      path.join(workspace, "overrepo.yaml"),
+      [
+        "root: ..",
+        "projects:",
+        "  qualifio/collect/collect:",
+        `    url: ${url}`,
+        "    tags: [collect]",
+        "",
+      ].join("\n"),
+    );
+
+    const args = ["-c", "workspace/overrepo.yaml"];
+    const synced = await cli(hub, [...args, "sync", "--tags", "collect"]);
+    expect(synced.code).toBe(0);
+    expect(existsSync(path.join(hub, "qualifio/collect/collect/README.md"))).toBe(true);
+    expect(existsSync(path.join(hub, ".gitignore"))).toBe(false);
+
+    const listed = JSON.parse((await cli(hub, [...args, "list", "--json"])).stdout) as Array<{
+      path: string;
+    }>;
+    expect(listed.map((project) => project.path)).toEqual(["qualifio/collect/collect"]);
+
+    const doctor = await cli(hub, [...args, "doctor", "--no-network", "--json"]);
+    expect(doctor.code).toBe(0);
+    const checks = JSON.parse(doctor.stdout).checks as Array<{ id: string; level: string }>;
+    expect(checks.find((check) => check.id === "orphans")).toMatchObject({ level: "ok" });
   });
 });
 
@@ -341,39 +258,33 @@ describe("import", () => {
     const root = tempDir("overrepo-import-");
     writeFileSync(
       path.join(root, "overrepo.yaml"),
-      "# header comment\nprojects:\n  # the API\n  api:\n    path: backend/api\n    url: git@github.com:client/api.git\n  old:\n    url: git@github.com:client/old.git\n",
+      "# header comment\nprojects:\n  # the API\n  backend/api:\n    url: git@github.com:client/api.git\n  old:\n    url: git@github.com:client/old.git\n",
     );
     const input = JSON.stringify({
       projects: [
         {
-          name: "api-renamed",
+          name: "backend/api",
           url: "https://github.com/client/api",
           desc: "API",
           tags: ["backend"],
         },
-        {
-          name: "web",
-          path: "frontend/web",
-          url: "git@github.com:client/web.git",
-          tags: ["frontend"],
-          stars: 3,
-        },
+        { name: "frontend/web", url: "git@github.com:client/web.git", tags: ["frontend"] },
       ],
     });
 
     const result = await cli(root, ["import", "--json"], input);
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout)).toMatchObject({
-      added: ["web"],
-      updated: { api: ["desc", "tags"] },
+      added: ["frontend/web"],
+      updated: { "backend/api": ["desc", "tags"] },
       missing: ["old"],
       removed: [],
     });
     const text = readFileSync(path.join(root, "overrepo.yaml"), "utf8");
     expect(text).toContain("# header comment");
-    expect(text).toContain("  # the API\n  api:");
+    expect(text).toContain("  # the API\n  backend/api:");
     expect(text).toContain("    tags: [ backend ]");
-    expect(text).toContain("  web:\n    path: frontend/web");
+    expect(text).toContain("  frontend/web:\n    url: git@github.com:client/web.git");
 
     const pruned = await cli(root, ["import", "--prune"], input);
     expect(pruned.code).toBe(0);
@@ -381,8 +292,56 @@ describe("import", () => {
 
     expect((await cli(root, ["import"], "{nope")).code).toBe(2);
     expect(
-      (await cli(root, ["import"], JSON.stringify([{ name: "bad", path: "../x" }]))).code,
+      (
+        await cli(
+          root,
+          ["import"],
+          JSON.stringify([{ name: "bad", path: "other", url: "https://example.com/a.git" }]),
+        )
+      ).code,
     ).toBe(2);
+    expect(
+      (
+        await cli(
+          root,
+          ["import"],
+          JSON.stringify([{ name: "../x", url: "https://example.com/x.git" }]),
+        )
+      ).code,
+    ).toBe(2);
+  });
+
+  it("writes projects as a block map and clones only what it added", async () => {
+    const root = tempDir("overrepo-import-flow-");
+    const remotes = tempDir("overrepo-import-remotes-");
+    const oldUrl = createRemote(remotes, "old");
+    const webUrl = createRemote(remotes, "web");
+    writeFileSync(path.join(root, "overrepo.yaml"), "projects: {}\n");
+    const imported = await cli(
+      root,
+      ["import"],
+      JSON.stringify({
+        projects: [
+          { name: "frontend/web", url: webUrl, tags: ["frontend", "node"] },
+          { name: "libraries/lib", url: "https://example.com/lib.git", tags: ["libraries"] },
+        ],
+      }),
+    );
+    expect(imported.code).toBe(0);
+    const text = readFileSync(path.join(root, "overrepo.yaml"), "utf8");
+    expect(text).toMatch(/projects:\n {2}frontend\/web:/);
+    expect(text).toContain("tags: [ frontend, node ]");
+    expect(text.split("\n").length).toBeGreaterThan(6);
+
+    writeFileSync(path.join(root, "overrepo.yaml"), `projects:\n  old:\n    url: ${oldUrl}\n`);
+    const synced = await cli(
+      root,
+      ["import", "--sync", "--json"],
+      JSON.stringify({ projects: [{ name: "frontend/web", url: webUrl }] }),
+    );
+    expect(synced.code).toBe(0);
+    expect(existsSync(path.join(root, "frontend/web/README.md"))).toBe(true);
+    expect(existsSync(path.join(root, "old"))).toBe(false);
   });
 });
 
@@ -411,19 +370,24 @@ describe("doctor", () => {
 
   it("exits with 2 on an invalid manifest", async () => {
     const root = tempDir();
-    writeFileSync(path.join(root, "overrepo.yaml"), "projects:\n  a:\n    path: ../x\n");
+    writeFileSync(
+      path.join(root, "overrepo.yaml"),
+      "projects:\n  ../x:\n    url: https://example.com/x.git\n",
+    );
     expect((await cli(root, ["doctor", "--no-network"])).code).toBe(2);
     const list = await cli(root, ["list"]);
     expect(list.code).toBe(2);
-    expect(list.stderr).toMatch(
-      /overrepo\.yaml:3:11 projects\.a\.path: path "\.\.\/x" escapes the manifest root/,
-    );
+    expect(list.stderr).toMatch(/escapes the fleet root/);
   });
 });
 
 describe("cli", () => {
   it("prints help and version", async () => {
-    expect((await cli(tempDir(), ["--help"])).stdout).toContain("Usage: overrepo");
+    const help = await cli(tempDir(), ["--help"]);
+    expect(help.stdout).toContain("Usage: overrepo");
+    expect(help.stdout).toContain("sync");
+    expect(help.stdout).not.toMatch(/\bcontext\b/);
+    expect(help.stdout).not.toMatch(/\n {2}run\b/);
     expect((await cli(tempDir(), ["--version"])).stdout).toMatch(/^\d+\.\d+\.\d+/);
     expect((await cli(tempDir(), ["list"])).code).toBe(2);
   });

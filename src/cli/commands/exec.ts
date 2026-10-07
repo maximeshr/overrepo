@@ -27,7 +27,7 @@ interface ExecFlags extends SelectionOptions {
 
 function withExecOptions(command: Command): Command {
   return withSelection(command)
-    .option("--parallel", "run in parallel (concurrency from the manifest)")
+    .option("--parallel", "run in parallel")
     .option("-j, --concurrency <n>", "run in parallel with this concurrency", positiveInt)
     .option(
       "-o, --output <mode>",
@@ -37,7 +37,7 @@ function withExecOptions(command: Command): Command {
     .option("--json", "capture output and print results as JSON");
 }
 
-/** Shared by `exec` and `run`. Returns the exit code. */
+/** Runs one command in each selected project. Returns the exit code. */
 export async function runInProjects(
   io: Io,
   manifest: Manifest,
@@ -79,14 +79,14 @@ export async function runInProjects(
       if (flags.json) return;
       if (event.type === "start" && mode === "raw") {
         io.write(
-          `\n${projectColor(colors, event.project.name)(colors.bold(`▸ ${event.project.name}`))} ${colors.dim(event.project.path)}\n`,
+          `\n${projectColor(colors, event.project.name)(colors.bold(`▸ ${event.project.name}`))}\n`,
         );
       }
       if (event.type !== "done") return;
       const { result } = event;
       if (mode === "grouped" && result.value?.output) {
         io.write(
-          `\n${projectColor(colors, result.project.name)(colors.bold(`▸ ${result.project.name}`))} ${colors.dim(result.project.path)}\n`,
+          `\n${projectColor(colors, result.project.name)(colors.bold(`▸ ${result.project.name}`))}\n`,
         );
         for (const { line } of result.value.output) io.write(`${line}\n`);
       }
@@ -135,41 +135,6 @@ export const registerExec: Register = (program, run, io) => {
       const projects = select(manifest, options, true);
       const cmd = commandArgs.length === 1 ? (commandArgs[0] as string) : commandArgs;
       return runInProjects(io, manifest, projects, cmd, options);
-    }),
-  );
-};
-
-export const registerRun: Register = (program, run, io) => {
-  withExecOptions(
-    program
-      .command("run")
-      .description(
-        "run a task defined in the manifest in each selected project; without a task, list tasks",
-      )
-      .argument("[task]", "task name"),
-  ).action(
-    run(async (taskName: string | undefined, options: ExecFlags, command) => {
-      const manifest = await load(contextOf(io, command));
-      const tasks = Object.values(manifest.tasks);
-      if (!taskName) {
-        if (tasks.length === 0) {
-          io.error("no tasks defined in the manifest\n");
-          return 0;
-        }
-        const width = Math.max(...tasks.map((task) => task.name.length));
-        for (const task of tasks)
-          io.write(
-            `${io.colors.bold(task.name.padEnd(width))}  ${task.desc ?? ""} ${io.colors.dim(`(${task.cmd})`)}\n`,
-          );
-        return 0;
-      }
-      const task = manifest.tasks[taskName];
-      if (!task) {
-        const available = tasks.map((t) => t.name).join(", ") || "none";
-        throw new UsageError(`unknown task "${taskName}" (available: ${available})`);
-      }
-      const projects = select(manifest, options, true);
-      return runInProjects(io, manifest, projects, task.cmd, options);
     }),
   );
 };

@@ -1,14 +1,17 @@
-import { readdir } from "node:fs/promises";
+import { type Dirent } from "node:fs";
+import { readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
-import { PARTIAL_SUFFIX } from "./gitignore.ts";
+import { PARTIAL_SUFFIX } from "./model.ts";
 import { toPosixRelative } from "./paths.ts";
 
 const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target"]);
+/** T3 worktrees live next to a checkout (`t3-<id>`). They are not leaf repositories. */
+const T3_WORKTREE = /^t3-/;
 
 export interface ScanOptions {
   /** Maximum directory depth below root (root = 0). */
   maxDepth?: number;
-  /** POSIX relative paths that must not be descended into (e.g. `ai/repos`). */
+  /** POSIX relative paths that must not be descended into. */
   ignore?: string[];
 }
 
@@ -19,11 +22,26 @@ export interface ScanResult {
   partials: string[];
 }
 
+async function directoryChild(parent: string, entry: Dirent): Promise<string | undefined> {
+  const child = path.join(parent, entry.name);
+  if (entry.isSymbolicLink()) {
+    try {
+      if (!(await stat(child)).isDirectory()) return undefined;
+    } catch {
+      return undefined;
+    }
+    return child;
+  }
+  return entry.isDirectory() ? child : undefined;
+}
+
 /** Walks the tree below `root` looking for git repositories. The root repository itself is ignored. */
 export async function scanRepos(root: string, options: ScanOptions = {}): Promise<ScanResult> {
   const maxDepth = options.maxDepth ?? 4;
   const ignore = new Set(options.ignore ?? []);
   const result: ScanResult = { repos: [], partials: [] };
+  const seen = new Set<string>();
+  seen.add(await realpath(root).catch(() => path.resolve(root)));
 
   const walk = async (dir: string, depth: number): Promise<void> => {
     let entries;
@@ -34,15 +52,25 @@ export async function scanRepos(root: string, options: ScanOptions = {}): Promis
     }
     const children: string[] = [];
     for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const child = path.join(dir, entry.name);
-      const relative = toPosixRelative(root, child);
       if (entry.name.endsWith(PARTIAL_SUFFIX) && entry.name.startsWith(".")) {
-        result.partials.push(relative);
+        const partial = await directoryChild(dir, entry);
+        if (partial) result.partials.push(toPosixRelative(root, partial));
         continue;
       }
-      if (entry.name.startsWith(".") || SKIPPED_DIRS.has(entry.name) || ignore.has(relative))
+      if (
+        entry.name.startsWith(".") ||
+        SKIPPED_DIRS.has(entry.name) ||
+        T3_WORKTREE.test(entry.name)
+      ) {
         continue;
+      }
+      const child = await directoryChild(dir, entry);
+      if (!child) continue;
+      const relative = toPosixRelative(root, child);
+      if (ignore.has(relative) || relative === "." || relative.startsWith("../")) continue;
+      const real = await realpath(child).catch(() => child);
+      if (seen.has(real)) continue;
+      seen.add(real);
       children.push(child);
     }
     await Promise.all(

@@ -1,4 +1,3 @@
-import path from "node:path";
 import { sync } from "../../core/sync.ts";
 import {
   contextOf,
@@ -27,9 +26,7 @@ export const registerSync: Register = (program, run, io) => {
   withSelection(
     program
       .command("sync")
-      .description(
-        "clone missing projects and update the managed .gitignore block (all projects unless filtered)",
-      )
+      .description("clone missing projects (all unless filtered)")
       .option("--pull", "also fetch and fast-forward existing clones")
       .option("--dry-run", "show what would be done")
       .option("-j, --concurrency <n>", "parallel operations", positiveInt)
@@ -60,9 +57,6 @@ export const registerSync: Register = (program, run, io) => {
 
       if (options.json) {
         json(io, {
-          gitignore: report.gitignore
-            ? { file: report.gitignore.file, changed: report.gitignore.changed }
-            : null,
           results: report.results.map((result) => ({
             name: result.project.name,
             path: result.project.path,
@@ -75,12 +69,6 @@ export const registerSync: Register = (program, run, io) => {
         return report.results.some((result) => result.status === "failed") ? 1 : 0;
       }
 
-      if (report.gitignore?.changed) {
-        const verb = options.dryRun ? "would update" : "updated";
-        io.error(
-          `${io.colors.cyan("ℹ")} ${verb} ${path.relative(context.cwd, report.gitignore.file) || ".gitignore"}\n`,
-        );
-      }
       return printSummary(io, report.results, {
         label: options.dryRun ? "sync (dry run)" : "sync",
       });

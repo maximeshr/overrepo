@@ -27,7 +27,7 @@ export const registerStatus: Register = (program, run, io) => {
         options: SelectionOptions & { concurrency?: number; dirty?: boolean; json?: boolean },
         command,
       ) => {
-        const manifest = await load(contextOf(io, command), { quiet: options.json });
+        const manifest = await load(contextOf(io, command));
         const results = await status(manifest, {
           projects: select(manifest, options),
           concurrency: options.concurrency,

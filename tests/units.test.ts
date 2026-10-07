@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vite-plus/test";
-import { extractManual, manualBlock, readmeExcerpt } from "../src/context/markdown.ts";
-import { GITIGNORE_BEGIN, GITIGNORE_END, updateGitignoreContent } from "../src/core/gitignore.ts";
 import { parseManifest } from "../src/core/manifest.ts";
 import { selectProjects } from "../src/core/selection.ts";
 import { normalizeGitUrl } from "../src/core/urls.ts";
@@ -10,10 +8,10 @@ describe("selectProjects", () => {
   const { projects } = parseManifest(
     `
 projects:
-  api: { path: backend/api, tags: [backend, node] }
-  billing: { path: backend/billing, tags: [backend, php] }
-  web: { path: frontend/web, tags: [frontend, node] }
-  legacy: { path: backend/legacy, tags: [backend, deprecated] }
+  backend/api: { url: https://example.com/api.git, tags: [backend, node] }
+  backend/billing: { url: https://example.com/billing.git, tags: [backend, php] }
+  frontend/web: { url: https://example.com/web.git, tags: [frontend, node] }
+  backend/legacy: { url: https://example.com/legacy.git, tags: [backend, deprecated] }
 `,
     "/m/overrepo.yaml",
   );
@@ -21,55 +19,30 @@ projects:
     selectProjects(projects, selection, { requireExplicit }).map((project) => project.name);
 
   it("returns everything without selection, unless an explicit one is required", () => {
-    expect(names({})).toEqual(["api", "billing", "web", "legacy"]);
+    expect(names({})).toEqual(["backend/api", "backend/billing", "frontend/web", "backend/legacy"]);
     expect(() => names({}, true)).toThrow(/no projects selected/);
-    expect(() => names({ excludeTags: ["php"] }, true)).toThrow(/no projects selected/);
   });
 
-  it("combines tags with AND, tags-any with OR", () => {
-    expect(names({ tags: ["backend", "node"] })).toEqual(["api"]);
-    expect(names({ tagsAny: ["php", "frontend"] })).toEqual(["billing", "web"]);
+  it("requires every tag", () => {
+    expect(names({ tags: ["backend", "node"] })).toEqual(["backend/api"]);
   });
 
   it("filters by path prefix on segment boundaries", () => {
-    expect(names({ paths: ["backend/"] })).toEqual(["api", "billing", "legacy"]);
+    expect(names({ paths: ["backend/"] })).toEqual([
+      "backend/api",
+      "backend/billing",
+      "backend/legacy",
+    ]);
     expect(names({ paths: ["back"] })).toEqual([]);
-    expect(names({ paths: ["frontend/web"] })).toEqual(["web"]);
+    expect(names({ paths: ["frontend/web"] })).toEqual(["frontend/web"]);
   });
 
-  it("selects by name and rejects unknown names", () => {
-    expect(names({ projects: ["web", "api"] })).toEqual(["api", "web"]);
+  it("selects by path and rejects unknown paths", () => {
+    expect(names({ projects: ["frontend/web", "backend/api"] })).toEqual([
+      "backend/api",
+      "frontend/web",
+    ]);
     expect(() => names({ projects: ["nope"] })).toThrow(/unknown project: nope/);
-  });
-
-  it("applies exclusions last", () => {
-    expect(names({ all: true, excludeTags: ["deprecated", "php"] })).toEqual(["api", "web"]);
-  });
-});
-
-describe("gitignore block", () => {
-  it("appends the block and keeps the rest intact", () => {
-    const next = updateGitignoreContent("node_modules\n# mine\n", ["b/x", "a/y"]);
-    expect(next).toBe(
-      `node_modules\n# mine\n\n${GITIGNORE_BEGIN}\n/a/y/\n/b/x/\n.*.overrepo-partial/\n${GITIGNORE_END}\n`,
-    );
-  });
-
-  it("only rewrites the managed block", () => {
-    const before = `top\n${GITIGNORE_BEGIN}\n/old/\n${GITIGNORE_END}\nbottom`;
-    expect(updateGitignoreContent(before, ["new"])).toBe(
-      `top\n${GITIGNORE_BEGIN}\n/new/\n.*.overrepo-partial/\n${GITIGNORE_END}\nbottom`,
-    );
-  });
-
-  it("is idempotent and keeps CRLF files in CRLF", () => {
-    const once = updateGitignoreContent("a\r\n", ["x"]);
-    expect(updateGitignoreContent(once, ["x"])).toBe(once);
-    expect(once).toContain(`${GITIGNORE_BEGIN}\r\n/x/\r\n`);
-  });
-
-  it("escapes glob characters", () => {
-    expect(updateGitignoreContent("", ["a[1]"])).toContain("/a\\[1\\]/");
   });
 });
 
@@ -117,52 +90,5 @@ describe("parseStatus", () => {
       branch: undefined,
       head: undefined,
     });
-  });
-});
-
-describe("markdown helpers", () => {
-  it("extracts and re-renders the manual block", () => {
-    const block = manualBlock("my notes\n- keep me");
-    expect(extractManual(`# x\n\n${block}\n`)).toBe("my notes\n- keep me");
-    expect(extractManual("no block")).toBeUndefined();
-  });
-
-  it("builds a bounded README excerpt", () => {
-    const readme = [
-      "# Title",
-      "[![build](https://x/badge.svg)](https://x)",
-      "<!-- hidden -->",
-      "Intro text.",
-      "## Install",
-      "```sh",
-      "# not a heading",
-      "npm i",
-      "```",
-      "<!-- overrepo:manual -->",
-    ].join("\n");
-    const { text, truncated } = readmeExcerpt(readme, 1000);
-    expect(truncated).toBe(false);
-    expect(text).toBe("Intro text.\n#### Install\n```sh\n# not a heading\nnpm i\n```");
-  });
-
-  it("drops HTML-only lines and headings orphaned by truncation", () => {
-    const readme = [
-      '<p align="center"><a href="x"><img src="logo.svg"></a></p>',
-      '<a href="ci"><img src="badge.svg" alt="Build"></a>',
-      "Intro <b>bold</b> text.",
-      "",
-      "## Next section",
-      "x".repeat(200),
-    ].join("\n");
-    const { text, truncated } = readmeExcerpt(readme, 60);
-    expect(truncated).toBe(true);
-    expect(text).toBe("Intro <b>bold</b> text.");
-  });
-
-  it("never leaves a code fence open when truncating", () => {
-    const readme = `Intro\n\n\`\`\`\n${"line\n".repeat(50)}\`\`\`\n`;
-    const { text, truncated } = readmeExcerpt(readme, 60);
-    expect(truncated).toBe(true);
-    expect((text.match(/```/g) ?? []).length % 2).toBe(0);
   });
 });

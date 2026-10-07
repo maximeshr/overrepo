@@ -1,14 +1,10 @@
 {
   "name": "overrepo",
   "version": "0.0.1",
-  "description": "Manage a fleet of git repos from a declarative manifest, and make the meta-repo readable by AI agents.",
+  "description": "Manage a fleet of git repositories from one manifest.",
   "keywords": [
-    "agents",
-    "ai",
     "cli",
-    "context",
     "git",
-    "meta-repo",
     "multi-repo"
   ],
   "homepage": "https://github.com/maximeshr/overrepo#readme",

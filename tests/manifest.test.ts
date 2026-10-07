@@ -15,124 +15,86 @@ function issuesOf(text: string, file?: string): ManifestError["issues"] {
 }
 
 describe("parseManifest", () => {
-  it("resolves defaults and project settings", () => {
+  it("resolves the project key as the path", () => {
     const manifest = parse(`
-version: 1
-defaults:
-  concurrency: 4
-  clone:
-    depth: 1
 projects:
-  billing-api:
-    path: backend/billing-api/
+  backend/billing-api:
     url: git@github.com:client/billing-api.git
     desc: Billing API
     tags: [backend, billing]
-    clone:
-      branch: develop
-  web:
-tasks:
-  pull: git pull --ff-only
-  lint:
-    desc: Lint
-    cmd: npm run lint
+  frontend/web:
+    url: git@github.com:client/web.git
 `);
     expect(manifest.root).toBe("/meta");
-    expect(manifest.defaults).toMatchObject({ concurrency: 4, retries: 2 });
-    expect(manifest.context).toMatchObject({ outDir: "ai/repos", index: "ai/repos/index.md" });
-    expect(manifest.gitignore.sync).toBe(true);
+    expect(manifest.manifestDir).toBe("/meta");
+    expect(manifest.defaults).toMatchObject({ concurrency: 8, retries: 2 });
     const [billing, web] = manifest.projects;
     expect(billing).toMatchObject({
-      name: "billing-api",
+      name: "backend/billing-api",
       path: "backend/billing-api",
       dir: "/meta/backend/billing-api",
+      url: "git@github.com:client/billing-api.git",
       tags: ["backend", "billing"],
-      sync: true,
-      clone: { depth: 1, filter: "blob:none", branch: "develop" },
+      desc: "Billing API",
     });
-    expect(web).toMatchObject({ name: "web", path: "web", url: undefined, tags: [] });
-    expect(manifest.tasks.pull).toEqual({
-      name: "pull",
-      desc: undefined,
-      cmd: "git pull --ff-only",
+    expect(web).toMatchObject({
+      name: "frontend/web",
+      path: "frontend/web",
+      dir: "/meta/frontend/web",
     });
-    expect(manifest.tasks.lint?.cmd).toBe("npm run lint");
+  });
+
+  it("resolves a fleet root above the manifest", () => {
+    const manifest = parse(
+      `
+root: ..
+projects:
+  qualifio/collect/collect:
+    url: git@gitlab.example:qualifioapp/collect/collect.git
+    tags: [collect]
+`,
+      "/meta/workspace/overrepo.yaml",
+    );
+    expect(manifest.root).toBe("/meta");
+    expect(manifest.manifestDir).toBe("/meta/workspace");
+    expect(manifest.projects[0]).toMatchObject({
+      path: "qualifio/collect/collect",
+      dir: "/meta/qualifio/collect/collect",
+    });
   });
 
   it("reports unknown keys with their YAML path and line", () => {
-    const issues = issuesOf("projects:\n  api:\n    url: x\n    descr: typo\n");
+    const issues = issuesOf("projects:\n  api:\n    url: x\n    path: api\n");
     expect(issues).toEqual([
       expect.objectContaining({
-        path: "projects.api.descr",
+        path: "projects.api.path",
         line: 4,
-        message: 'unknown key "descr"',
+        message: 'unknown key "path"',
       }),
     ]);
   });
 
-  it("reports type errors with their location", () => {
-    const issues = issuesOf("defaults:\n  concurrency: lots\n");
-    expect(issues[0]).toMatchObject({ path: "defaults.concurrency", line: 2 });
-  });
-
-  it("rejects paths escaping the root", () => {
-    expect(issuesOf("projects:\n  a:\n    path: ../outside\n")[0]?.message).toMatch(
-      /escapes the manifest root/,
+  it("rejects paths escaping the fleet root", () => {
+    expect(
+      issuesOf("projects:\n  ../outside:\n    url: https://example.com/x.git\n")[0]?.message,
+    ).toMatch(/escapes the fleet root/);
+    expect(issuesOf("root: /tmp\nprojects: {}\n")[0]?.message).toMatch(/must be relative/);
+    expect(issuesOf("projects:\n  .:\n    url: https://example.com/x.git\n")[0]?.message).toMatch(
+      /fleet root itself/,
     );
-    expect(issuesOf("projects:\n  a:\n    path: /abs\n")[0]?.message).toMatch(/must be relative/);
-    expect(issuesOf("projects:\n  a:\n    path: .\n")[0]?.message).toMatch(/root itself/);
   });
 
-  it("rejects duplicate paths and names", () => {
-    expect(issuesOf("projects:\n  a:\n    path: x/y\n  b:\n    path: x/y/\n")[0]).toMatchObject({
-      path: "projects.b.path",
-      message: 'path "x/y" is already used by project "a"',
-    });
-    expect(issuesOf("projects:\n  a: {}\n  a: {}\n")[0]?.message).toMatch(/unique/i);
-  });
-
-  it("rejects projects inside the context directory", () => {
-    expect(issuesOf("projects:\n  a:\n    path: ai/repos/a\n")[0]?.message).toMatch(
-      /context.outDir/,
-    );
+  it("rejects duplicate paths", () => {
+    expect(
+      issuesOf(
+        "projects:\n  Backend/Api:\n    url: https://example.com/a.git\n  backend/api:\n    url: https://example.com/b.git\n",
+      )[0]?.message,
+    ).toMatch(/already used/);
   });
 
   it("rejects tags with commas or spaces", () => {
-    expect(issuesOf("projects:\n  a:\n    tags: ['a,b']\n")[0]?.path).toBe("projects.a.tags.0");
-  });
-
-  it("reads the supported subset of mani.yaml", () => {
-    const manifest = parse(
-      `
-import: [other.yaml]
-projects:
-  meta:
-    path: .
-  api:
-    path: backend/api
-    url: git@github.com:client/api.git
-    desc: API
-    tags: [backend]
-    branch: develop
-    env:
-      FOO: bar
-tasks:
-  hello: echo hello
-  multi:
-    commands:
-      - cmd: echo 1
-  pull:
-    desc: Pull
-    cmd: git pull
-    target: all
-`,
-      "/meta/mani.yaml",
-    );
-    expect(manifest.format).toBe("mani");
-    expect(manifest.projects.map((project) => project.name)).toEqual(["api"]);
-    expect(manifest.projects[0]?.clone.branch).toBe("develop");
-    expect(Object.keys(manifest.tasks)).toEqual(["hello", "pull"]);
-    expect(manifest.warnings.join("\n")).toMatch(/projects\.api\.env/);
-    expect(manifest.warnings.join("\n")).toMatch(/"meta" points to the root/);
+    expect(
+      issuesOf("projects:\n  a:\n    url: https://example.com/a.git\n    tags: ['a,b']\n")[0]?.path,
+    ).toBe("projects.a.tags.0");
   });
 });

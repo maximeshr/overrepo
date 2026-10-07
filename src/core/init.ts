@@ -1,19 +1,16 @@
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Document, isMap, isSeq, YAMLMap } from "yaml";
+import { Document, isMap, isSeq } from "yaml";
 import { originUrl } from "../git/git.ts";
 import { scanRepos } from "./discover.ts";
 import { ManifestError, OverrepoError } from "./errors.ts";
-import { convertMani } from "./mani.ts";
-import { parseManifest, parseManifestDocument } from "./manifest.ts";
-import { DEFAULT_CONTEXT, MANI_FILES, MANIFEST_FILES } from "./model.ts";
+import { parseManifest } from "./manifest.ts";
+import { MANIFEST_FILES } from "./model.ts";
 
 export interface InitOptions {
-  /** Directory that becomes the manifest root. */
+  /** Directory to scan. Project paths are relative to it. */
   root: string;
-  /** Convert an existing `mani.yaml` instead of scanning. */
-  fromMani?: boolean;
   /** Overwrite an existing `overrepo.yaml`. */
   force?: boolean;
   dryRun?: boolean;
@@ -31,12 +28,7 @@ export interface InitResult {
 
 const HEADER = " overrepo manifest — https://github.com/maximeshr/overrepo#manifest";
 
-const DEFAULT_TASKS = {
-  pull: { desc: "Fast-forward the current branch", cmd: "git pull --ff-only" },
-  status: { desc: "Short git status", cmd: "git status -s" },
-};
-
-function sanitizeName(name: string): string {
+function sanitizeTag(name: string): string {
   return name.replace(/[\s,]+/g, "-");
 }
 
@@ -63,15 +55,11 @@ export function createManifestDocument(manifest: Record<string, unknown>): Docum
   if (isMap(projects)) {
     for (const pair of projects.items) {
       if (!isMap(pair.value)) continue;
-      for (const key of ["tags", "owners"]) {
-        const list = pair.value.get(key, true);
-        if (isSeq(list)) list.flow = true;
-      }
+      const list = pair.value.get("tags", true);
+      if (isSeq(list)) list.flow = true;
     }
     projects.spaceBefore = true;
   }
-  const tasks = doc.get("tasks", true);
-  if (tasks instanceof YAMLMap) tasks.spaceBefore = true;
   return doc;
 }
 
@@ -80,11 +68,7 @@ async function scanManifest(
   depth: number | undefined,
   warnings: string[],
 ): Promise<Record<string, unknown>> {
-  const { repos } = await scanRepos(root, { maxDepth: depth, ignore: [DEFAULT_CONTEXT.outDir] });
-  const baseNames = new Map<string, number>();
-  for (const repo of repos)
-    baseNames.set(path.posix.basename(repo), (baseNames.get(path.posix.basename(repo)) ?? 0) + 1);
-
+  const { repos } = await scanRepos(root, { maxDepth: depth });
   const projects: Record<string, Record<string, unknown>> = {};
   const details = await Promise.all(
     repos.map(async (repo) => {
@@ -93,42 +77,20 @@ async function scanManifest(
     }),
   );
   for (const { repo, url, desc } of details) {
-    const base = path.posix.basename(repo);
-    let name = sanitizeName((baseNames.get(base) ?? 0) > 1 ? repo.replaceAll("/", "-") : base);
-    for (let suffix = 2; name in projects; suffix++) name = `${sanitizeName(base)}-${suffix}`;
-    const parent = path.posix.dirname(repo);
-    const project: Record<string, unknown> = { path: repo };
-    if (url) project.url = url;
-    else warnings.push(`${repo}: no "origin" remote, url left empty (sync will skip it)`);
+    if (!url) {
+      warnings.push(`${repo}: no "origin" remote, skipped`);
+      continue;
+    }
+    const project: Record<string, unknown> = { url };
     if (desc) project.desc = desc;
-    if (parent !== ".") project.tags = [sanitizeName(path.posix.basename(parent))];
-    projects[name] = project;
+    const parent = path.posix.dirname(repo);
+    if (parent !== ".") project.tags = [sanitizeTag(path.posix.basename(parent))];
+    projects[repo] = project;
   }
-
-  return {
-    version: 1,
-    defaults: { concurrency: 8, clone: { filter: "blob:none" } },
-    context: { outDir: DEFAULT_CONTEXT.outDir },
-    gitignore: { sync: true },
-    projects,
-    tasks: DEFAULT_TASKS,
-  };
+  return { projects };
 }
 
-async function maniManifest(root: string, warnings: string[]): Promise<Record<string, unknown>> {
-  const maniFile = MANI_FILES.map((name) => path.join(root, name)).find((file) => existsSync(file));
-  if (!maniFile) throw new OverrepoError(`--from-mani: no mani.yaml found in ${root}`, 2);
-  const { doc } = parseManifestDocument(await readFile(maniFile, "utf8"), maniFile);
-  const converted = convertMani(doc.toJS());
-  warnings.push(...converted.warnings);
-  return {
-    context: { outDir: DEFAULT_CONTEXT.outDir },
-    gitignore: { sync: true },
-    ...converted.manifest,
-  };
-}
-
-/** Creates `overrepo.yaml` from the git repositories found below `root`, or from `mani.yaml`. */
+/** Creates `overrepo.yaml` from the git repositories found below `root`. */
 export async function init(options: InitOptions): Promise<InitResult> {
   const root = path.resolve(options.root);
   const file = path.join(root, MANIFEST_FILES[0]);
@@ -143,14 +105,11 @@ export async function init(options: InitOptions): Promise<InitResult> {
   }
 
   const warnings: string[] = [];
-  const manifest = options.fromMani
-    ? await maniManifest(root, warnings)
-    : await scanManifest(root, options.depth, warnings);
+  const manifest = await scanManifest(root, options.depth, warnings);
   const text = createManifestDocument(manifest).toString({ lineWidth: 0 });
 
-  // Never write something `loadManifest` would reject.
   try {
-    parseManifest(text, file, "overrepo");
+    parseManifest(text, file);
   } catch (error) {
     if (error instanceof ManifestError) {
       throw new OverrepoError(

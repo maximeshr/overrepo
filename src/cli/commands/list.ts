@@ -13,20 +13,16 @@ export const registerList: Register = (program, run, io) => {
       .option("--names", "print project names only, one per line"),
   ).action(
     run(async (options: SelectionOptions & { json?: boolean; names?: boolean }, command) => {
-      const manifest = await load(contextOf(io, command), { quiet: options.json });
+      const manifest = await load(contextOf(io, command));
       const projects = select(manifest, options);
       if (options.json) {
         json(
           io,
           projects.map((project) => ({
-            name: project.name,
             path: project.path,
-            url: project.url ?? null,
+            url: project.url,
             desc: project.desc ?? null,
             tags: project.tags,
-            owners: project.owners,
-            links: project.links,
-            sync: project.sync,
             cloned: isGitRepo(project.dir),
           })),
         );
@@ -39,15 +35,14 @@ export const registerList: Register = (program, run, io) => {
       const { colors } = io;
       const rows = projects.map((project) => [
         isGitRepo(project.dir) ? colors.green("●") : colors.dim("○"),
-        colors.bold(project.name),
-        project.path,
+        colors.bold(project.path),
         colors.cyan(project.tags.join(",")),
         colors.dim(project.desc ?? ""),
       ]);
       io.write(
         table(
           rows,
-          ["", "NAME", "PATH", "TAGS", "DESCRIPTION"].map((cell) => colors.dim(cell)),
+          ["", "PATH", "TAGS", "DESCRIPTION"].map((cell) => colors.dim(cell)),
         ),
       );
       io.error(colors.dim(`${projects.length} project(s), ● cloned ○ not cloned\n`));

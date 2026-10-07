@@ -4,7 +4,6 @@ import { loadManifest } from "../core/manifest.ts";
 import type { Manifest, Project } from "../core/model.ts";
 import { selectProjects, type Selection } from "../core/selection.ts";
 import type { Io } from "./io.ts";
-import { warn } from "./output.ts";
 
 export interface GlobalOptions {
   cwd?: string;
@@ -23,10 +22,8 @@ export function contextOf(io: Io, command: Command): Context {
   return { io, cwd: path.resolve(io.cwd, globals.cwd ?? "."), config: globals.config };
 }
 
-export async function load(context: Context, options: { quiet?: boolean } = {}): Promise<Manifest> {
-  const manifest = await loadManifest({ cwd: context.cwd, file: context.config });
-  if (!options.quiet) for (const warning of manifest.warnings) warn(context.io, warning);
-  return manifest;
+export async function load(context: Context): Promise<Manifest> {
+  return loadManifest({ cwd: context.cwd, file: context.config });
 }
 
 export const list = (value: string, previous: string[] | undefined): string[] => [
@@ -61,30 +58,24 @@ export function nonNegativeInt(value: string): number {
 export interface SelectionOptions {
   all?: boolean;
   tags?: string[];
-  tagsAny?: string[];
   paths?: string[];
   projects?: string[];
-  excludeTags?: string[];
 }
 
 export function withSelection(command: Command): Command {
   return command
     .option("-a, --all", "select every project")
     .option("-t, --tags <tags>", "projects having all these tags (comma-separated)", list)
-    .option("--tags-any <tags>", "projects having at least one of these tags", list)
     .option("--paths <prefixes>", "projects under these path prefixes", list)
-    .option("-p, --projects <names>", "projects by name", list)
-    .option("--exclude-tags <tags>", "drop projects having any of these tags", list);
+    .option("-p, --projects <paths>", "projects by path (the manifest key)", list);
 }
 
 export function selection(options: SelectionOptions): Selection {
   return {
     all: options.all,
     tags: options.tags,
-    tagsAny: options.tagsAny,
     paths: options.paths,
     projects: options.projects,
-    excludeTags: options.excludeTags,
   };
 }
 

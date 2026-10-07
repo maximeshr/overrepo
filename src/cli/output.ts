@@ -83,9 +83,7 @@ export function printSummary(
   if (failures.length > 0) {
     io.error(`\n${colors.red(colors.bold(`${failures.length} failed:`))}\n`);
     for (const failure of failures)
-      io.error(
-        `  ${colors.red("✖")} ${failure.project.name} ${colors.dim(`(${failure.project.path})`)}: ${failure.error ?? "failed"}\n`,
-      );
+      io.error(`  ${colors.red("✖")} ${failure.project.path}: ${failure.error ?? "failed"}\n`);
   }
   const parts = [
     colors.green(`${counts.ok} ok`),
