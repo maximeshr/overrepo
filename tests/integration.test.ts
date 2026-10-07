@@ -190,7 +190,10 @@ describe("exec and status", () => {
       "--all",
       "-j",
       "4",
-      "echo hi; test $OVERREPO_PROJECT != frontend/web-3",
+      "--",
+      process.execPath,
+      "-e",
+      "console.log('hi'); if (process.env.OVERREPO_PROJECT === 'frontend/web-3') process.exit(1)",
     ]);
     expect(result.code).toBe(1);
     expect(result.stdout).toMatch(/^backend\/api-0 +│ hi$/m);
