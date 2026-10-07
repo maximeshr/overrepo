@@ -46,3 +46,14 @@ export {
   type DoctorReport,
 } from "./core/doctor.ts";
 export { normalizeGitUrl } from "./core/urls.ts";
+export {
+  generateContext,
+  cardPath,
+  type ContextFile,
+  type ContextOptions,
+  type ContextReport,
+  type FileStatus,
+} from "./context/generate.ts";
+export { analyzeProject, type Analysis } from "./context/analyze.ts";
+export { defaultDetectors } from "./context/detectors/index.ts";
+export type { Detection, Detector, PackageId, RepoFiles, Script } from "./context/types.ts";

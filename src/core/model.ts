@@ -17,19 +17,47 @@ export interface Defaults {
   retries: number;
 }
 
+export interface SummaryConfig {
+  /** POSIX path relative to the manifest file. */
+  outDir: string;
+  /** POSIX path of the index, relative to the manifest file. */
+  index: string;
+  include: string[];
+  maxBytes: number;
+  readmeMaxChars: number;
+  treeMaxEntries: number;
+}
+
 export interface Manifest {
   /**
    * Absolute fleet root. Project directories are resolved from it.
    * Equals `manifestDir` when `root` is omitted.
    */
   root: string;
-  /** Absolute directory containing the manifest file. */
+  /** Absolute directory containing the manifest file. Summaries are written relative to it. */
   manifestDir: string;
   /** Absolute path of the manifest file. */
   file: string;
   defaults: Defaults;
+  summary: SummaryConfig;
   projects: Project[];
 }
+
+export const DEFAULT_SUMMARY = {
+  outDir: "ai/repos",
+  include: [
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "package.json",
+    "composer.json",
+    "go.mod",
+    "Dockerfile",
+  ],
+  maxBytes: 16_000,
+  readmeMaxChars: 3_000,
+  treeMaxEntries: 40,
+} as const;
 
 export const DEFAULT_CONCURRENCY = 8;
 export const DEFAULT_TIMEOUT_SECONDS = 600;

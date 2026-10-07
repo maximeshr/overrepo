@@ -196,3 +196,55 @@ export async function pullFastForward(dir: string, options: GitRunOptions = {}):
 export async function lsRemote(url: string, options: GitRunOptions = {}): Promise<void> {
   await git(["ls-remote", "--exit-code", "--heads", url], options);
 }
+
+/** Top-level tracked entries of `ref` (`dirs` end with `/`), or `undefined` when the revision is missing. */
+export async function trackedTopLevel(
+  dir: string,
+  ref = "HEAD",
+  options: GitRunOptions = {},
+): Promise<string[] | undefined> {
+  try {
+    const output = await git(["ls-tree", "-z", ref], { ...options, cwd: dir });
+    return output
+      .split("\0")
+      .filter(Boolean)
+      .map((line) => {
+        const [meta = "", name = ""] = line.split("\t");
+        return meta.split(" ")[1] === "tree" ? `${name}/` : name;
+      });
+  } catch {
+    return undefined;
+  }
+}
+
+/** True when `ref:file` exists (blob or tree). */
+export async function gitPathExists(
+  dir: string,
+  ref: string,
+  file: string,
+  options: GitRunOptions = {},
+): Promise<boolean> {
+  try {
+    await git(["cat-file", "-e", `${ref}:${file}`], { ...options, cwd: dir });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** UTF-8 contents of `ref:file`, or `undefined` when it is missing or larger than `maxBytes`. */
+export async function readGitFile(
+  dir: string,
+  ref: string,
+  file: string,
+  maxBytes: number,
+  options: GitRunOptions = {},
+): Promise<string | undefined> {
+  try {
+    const size = Number(await git(["cat-file", "-s", `${ref}:${file}`], { ...options, cwd: dir }));
+    if (!Number.isFinite(size) || size > maxBytes) return undefined;
+    return await git(["show", `${ref}:${file}`], { ...options, cwd: dir });
+  } catch {
+    return undefined;
+  }
+}

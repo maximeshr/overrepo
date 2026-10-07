@@ -27,6 +27,7 @@ projects:
 `);
     expect(manifest.root).toBe("/meta");
     expect(manifest.manifestDir).toBe("/meta");
+    expect(manifest.summary).toMatchObject({ outDir: "ai/repos", index: "ai/repos/index.md" });
     expect(manifest.defaults).toMatchObject({ concurrency: 8, retries: 2 });
     const [billing, web] = manifest.projects;
     expect(billing).toMatchObject({
@@ -48,6 +49,8 @@ projects:
     const manifest = parse(
       `
 root: ..
+summary:
+  outDir: aidd_docs/memory/internal
 projects:
   qualifio/collect/collect:
     url: git@gitlab.example:qualifioapp/collect/collect.git
@@ -61,6 +64,8 @@ projects:
       path: "qualifio/collect/collect",
       dir: "/meta/qualifio/collect/collect",
     });
+    expect(manifest.summary.outDir).toBe("aidd_docs/memory/internal");
+    expect(manifest.summary.index).toBe("aidd_docs/memory/internal/index.md");
   });
 
   it("reports unknown keys with their YAML path and line", () => {

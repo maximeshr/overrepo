@@ -1,6 +1,7 @@
 import { Command, CommanderError } from "commander";
 import pkg from "../../package.json" with { type: "json" };
 import { OverrepoError } from "../core/errors.ts";
+import { registerContext } from "./commands/context.ts";
 import { registerDoctor } from "./commands/doctor.ts";
 import { registerExec } from "./commands/exec.ts";
 import { registerImport } from "./commands/import.ts";
@@ -39,6 +40,7 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     registerList,
     registerStatus,
     registerExec,
+    registerContext,
     registerImport,
     registerDoctor,
   ]) {

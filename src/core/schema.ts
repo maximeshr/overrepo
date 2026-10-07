@@ -20,6 +20,11 @@ export const manifestSchema = z.strictObject({
    * `..` places clones next to the directory that holds the manifest.
    */
   root: text.optional(),
+  /**
+   * Where repository summaries are written, relative to this file.
+   * Omitted, the directory is `ai/repos`.
+   */
+  summary: z.strictObject({ outDir: text.optional() }).optional(),
   projects: z.record(identifier, projectSchema),
 });
 
