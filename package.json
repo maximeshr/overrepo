@@ -1,0 +1,78 @@
+{
+  "name": "overrepo",
+  "version": "0.0.1",
+  "description": "Manage a fleet of git repos from a declarative manifest, and make the meta-repo readable by AI agents.",
+  "keywords": [
+    "agents",
+    "ai",
+    "cli",
+    "context",
+    "git",
+    "meta-repo",
+    "multi-repo"
+  ],
+  "homepage": "https://github.com/maximeshr/overrepo#readme",
+  "bugs": {
+    "url": "https://github.com/maximeshr/overrepo/issues"
+  },
+  "license": "MIT",
+  "author": "Maxime Sahroui",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maximeshr/overrepo.git"
+  },
+  "bin": {
+    "overrepo": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build",
+    "changeset": "changeset",
+    "release": "vp pack && changeset publish"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "execa": "^10.0.1",
+    "p-limit": "^7.3.3",
+    "picocolors": "^1.1.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^24.19.1",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.9.1",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.21.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
