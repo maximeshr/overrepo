@@ -37,6 +37,6 @@ flowchart TD
 
 ## Test acceptance criteria
 
-| Task | Acceptance criteria                                                                                          |
-| ---- | ------------------------------------------------------------------------------------------------------------ |
+| Task | Acceptance criteria                                                                                           |
+| ---- | ------------------------------------------------------------------------------------------------------------- |
 | 1    | A dry-run scan lists `t3-abc` and the symlinked repository, and does not list the directory where it started. |

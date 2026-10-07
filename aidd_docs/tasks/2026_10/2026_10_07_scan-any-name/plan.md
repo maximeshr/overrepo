@@ -7,10 +7,10 @@ status: implemented
 
 ## Overview
 
-| Field      | Value                                                                 |
-| ---------- | --------------------------------------------------------------------- |
-| **Goal**   | Stop excluding directories by a `t3-` name prefix during a scan.     |
-| **Source** | `aidd_docs/tasks/2026_10/2026_10_07_scan-any-name/spec.md`            |
+| Field      | Value                                                            |
+| ---------- | ---------------------------------------------------------------- |
+| **Goal**   | Stop excluding directories by a `t3-` name prefix during a scan. |
+| **Source** | `aidd_docs/tasks/2026_10/2026_10_07_scan-any-name/spec.md`       |
 
 ## Phases
 

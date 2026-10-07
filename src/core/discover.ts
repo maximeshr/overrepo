@@ -4,7 +4,7 @@ import path from "node:path";
 import { PARTIAL_SUFFIX } from "./model.ts";
 import { toPosixRelative } from "./paths.ts";
 
-const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target"]);;
+const SKIPPED_DIRS = new Set(["node_modules", "vendor", "dist", "build", "target"]);
 
 export interface ScanOptions {
   /** Maximum directory depth below root (root = 0). */
