@@ -1,7 +1,7 @@
 import path from "node:path";
 
 /**
- * Normalizes a path relative to the fleet root (`qualifio/collect/collect`).
+ * Normalizes a path relative to the fleet root (`acme/collect/collect`).
  * Returns an error message when the path is absolute, empty, or leaves the root.
  */
 export function normalizeRelativePath(input: string): { path: string } | { error: string } {

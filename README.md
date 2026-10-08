@@ -2,43 +2,74 @@
 
 Manage a fleet of git repositories from one manifest.
 
+Describe your repositories once in `overrepo.yaml`, then clone, update, inspect and script them together: by tag, by path, or all at once.
+
 ```sh
-overrepo -c workspace/overrepo.yaml sync --tags collect
-overrepo -c workspace/overrepo.yaml exec --tags collect -- git status -s
+npm install -g overrepo
+
+overrepo init                          # write a manifest from the repositories already on disk
+overrepo sync                          # clone everything that is missing
+overrepo status --dirty                # show repositories with local changes
+overrepo exec --tags api -- git pull   # run a command in a subset
 ```
 
 Requires Node.js 24 or later, and `git` in `PATH`.
 
+## Contents
+
+- [Layout](#layout)
+- [Manifest](#manifest)
+- [Commands](#commands)
+- [Selecting projects](#selecting-projects)
+- [Repository summaries](#repository-summaries)
+- [Importing a catalogue](#importing-a-catalogue)
+- [Robustness](#robustness)
+- [Programmatic API](#programmatic-api)
+- [Development](#development)
+
 ## Layout
 
-The manifest lives in a git. The clones sit next to that git. The directory you open does not have to be a repository.
+The manifest lives in a git repository; the clones sit next to it. The directory you open does not have to be a repository itself.
 
 ```text
-qualifio-workspace/                 ← not a git
-├── workspace/                      ← the git that versions the manifest
-│   └── overrepo.yaml               ← root: ..
-├── qualifio/collect/collect/       ← clone
-└── ops/flux/applications/
+acme/                         ← fleet root, not a git
+├── workspace/                ← the git that versions the manifest
+│   └── overrepo.yaml         ← root: ..
+├── apps/web/                 ← clone
+├── services/api/             ← clone
+└── infra/terraform/          ← clone
 ```
+
+## Manifest
 
 ```yaml
 # workspace/overrepo.yaml
 root: ..
 projects:
-  qualifio/collect/collect:
-    url: git@gitlab.example:qualifioapp/collect/collect.git
-    tags: [collect, product, app]
-    desc: Collect
-  ops/flux/applications:
-    url: git@gitlab.example:qualifioapp/flux/applications.git
-    tags: [ops, flux]
+  apps/web:
+    url: git@github.com:acme/web.git
+    tags: [frontend, app]
+    desc: Customer-facing web app
+  services/api:
+    url: git@github.com:acme/api.git
+    tags: [backend, app]
+  infra/terraform:
+    url: git@github.com:acme/terraform.git
+    tags: [ops]
 ```
 
-The project key is the path, relative to `root`. `root` is relative to the manifest file; omit it to use the manifest's directory. A path may not be absolute and may not climb above `root` (`../outside` is rejected). `overrepo.yaml` is searched from the current directory upward; `-c <file>` points at it.
+| Key              | Meaning                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `root`           | Fleet root, relative to the manifest file. Omitted, it is the manifest's directory.      |
+| `projects`       | Map of path → project. The key is the clone path, relative to `root`.                    |
+| `url`            | Remote to clone. Required.                                                               |
+| `tags`           | Labels used by `--tags`. No whitespace or commas.                                        |
+| `desc`           | Free-text description, shown in summaries.                                               |
+| `summary.outDir` | Where `context` writes summaries, relative to the manifest file. Defaults to `ai/repos`. |
 
-`sync` clones the remote default branch. It does not write a `.gitignore`: the fleet root is not necessarily a git.
+A project path may not be absolute and may not climb above `root` (`../outside` is rejected).
 
-`context` writes summaries next to the manifest (`ai/repos/` when `summary.outDir` is omitted). Point `summary.outDir` wherever you want them versioned. They are read from `origin/HEAD`, so a dirty checkout does not change them.
+`overrepo.yaml` is searched from the current directory upward; `-c <file>` points at it explicitly.
 
 ## Commands
 
@@ -48,35 +79,14 @@ The project key is the path, relative to `root`. `root` is relative to the manif
 | `sync`            | Clones missing projects in parallel. `--pull` fetches and fast-forwards existing clones. `--dry-run`, `-j`, `--timeout`, `--retries`, `-q`, `--json`.                                                                        |
 | `list` (`ls`)     | Lists projects (`●` cloned, `○` not cloned). `--json`, `--names`.                                                                                                                                                            |
 | `status` (`st`)   | Branch, ahead/behind, local changes. `--dirty`, `--json`.                                                                                                                                                                    |
-| `context`         | Writes one summary per repository and an index, read from each clone's `origin/HEAD`. `--check` fails when a file is outdated and writes nothing. `--prune` deletes summaries of removed projects.                           |
+| `context`         | Writes one summary per repository and an index. `--check` fails when a file is outdated and writes nothing. `--prune` deletes summaries of removed projects.                                                                 |
 | `exec <command…>` | Runs a command in each selected project. Requires a selection.                                                                                                                                                               |
-| `import`          | Merges projects from JSON (stdin or `--file`) into a block-style `projects` map. `--sync` clones only the projects just added. `--overwrite`, `--prune`, `--dry-run`, `--json`.                                              |
-| `doctor`          | Checks git, remote access, the manifest, missing clones, orphan repositories and interrupted clones. The fleet root does not have to be a git. `--no-network`, `--json`.                                                     |
+| `import`          | Merges projects from JSON (stdin or `--file`) into the manifest. `--sync` clones only the projects just added. `--overwrite`, `--prune`, `--dry-run`, `--json`.                                                              |
+| `doctor`          | Checks git, remote access, the manifest, missing clones, orphan repositories and interrupted clones. `--no-network`, `--json`.                                                                                               |
 
 Global options: `-C <dir>`, `-c <file>`, `-v`, `-h`.
 
-### Selecting projects
-
-`exec`, `status`, `list`, `sync` and `context` accept:
-
-| Flag                   | Meaning                             |
-| ---------------------- | ----------------------------------- |
-| `-a, --all`            | every project                       |
-| `-t, --tags a,b`       | projects having **all** these tags  |
-| `--paths services/`    | projects under these path prefixes  |
-| `-p, --projects p1,p2` | projects by path (the manifest key) |
-
-Criteria combine with AND. Without a selector, `exec` refuses to run (exit code 2). The other commands use every project.
-
-```sh
-overrepo exec --tags collect -- git status -s
-overrepo sync -p qualifio/collect/collect,qualifio/libraries/foo
-```
-
-- After `--`, arguments run directly (no shell); a **single quoted argument** goes through the shell.
-- Sequential by default; `--parallel` uses 8 workers, `-j <n>` sets the count.
-- Commands receive `OVERREPO_ROOT`, `OVERREPO_PROJECT` and `OVERREPO_PROJECT_PATH` (the last two are the project path).
-- Projects that are not cloned are skipped.
+`sync` clones the remote default branch. It never writes a `.gitignore`: the fleet root is not necessarily a git.
 
 ### Exit codes
 
@@ -87,18 +97,53 @@ overrepo sync -p qualifio/collect/collect,qualifio/libraries/foo
 | `2`   | usage or configuration error |
 | `130` | interrupted (Ctrl+C)         |
 
+## Selecting projects
+
+`exec`, `status`, `list`, `sync` and `context` accept:
+
+| Flag                   | Meaning                             |
+| ---------------------- | ----------------------------------- |
+| `-a, --all`            | every project                       |
+| `-t, --tags a,b`       | projects having **all** these tags  |
+| `--paths services/`    | projects under these path prefixes  |
+| `-p, --projects p1,p2` | projects by path (the manifest key) |
+
+Criteria combine with AND. Without a selector, `exec` refuses to run (exit code 2); the other commands use every project.
+
+```sh
+overrepo exec --tags backend -- git status -s
+overrepo exec --all --parallel 'git fetch && git log -1 --oneline'
+overrepo sync -p apps/web,services/api
+```
+
+- After `--`, arguments run directly (no shell); a **single quoted argument** goes through the shell.
+- Sequential by default; `--parallel` uses 8 workers, `-j <n>` sets the count.
+- Commands receive `OVERREPO_ROOT`, `OVERREPO_PROJECT` and `OVERREPO_PROJECT_PATH` (the last two are the project path).
+- Projects that are not cloned are skipped.
+
+## Repository summaries
+
+`context` writes one Markdown summary per repository plus an `index.md`, under `summary.outDir` next to the manifest. Point `summary.outDir` wherever you want them versioned, for example to give AI assistants an overview of the whole fleet.
+
+```yaml
+summary:
+  outDir: docs/repos
+```
+
+Summaries are read from each clone's `origin/HEAD`, so a dirty checkout does not change them. In CI, `overrepo context --check` fails when a summary is out of date.
+
 ## Importing a catalogue
 
-A script you own (GitLab membership, for example) writes the manifest. overrepo does not talk to GitLab.
+A script you own (querying your Git hosting API, for example) can produce the project list. overrepo does not talk to any hosting provider itself.
 
 ```json
 {
   "projects": [
     {
-      "name": "qualifio/collect/collect",
-      "url": "git@gitlab.example:qualifioapp/collect/collect.git",
-      "tags": ["collect", "product", "app"],
-      "desc": "Collect"
+      "name": "apps/web",
+      "url": "git@github.com:acme/web.git",
+      "tags": ["frontend", "app"],
+      "desc": "Customer-facing web app"
     }
   ]
 }
@@ -107,12 +152,11 @@ A script you own (GitLab membership, for example) writes the manifest. overrepo 
 `name` is the path. A different `path` field is rejected. Unknown fields are ignored.
 
 ```sh
-./discover-repos.sh | overrepo -c workspace/overrepo.yaml import
-./discover-repos.sh | overrepo -c workspace/overrepo.yaml import --sync
-overrepo -c workspace/overrepo.yaml sync -p qualifio/collect/collect
+./list-repos.sh | overrepo -c workspace/overrepo.yaml import
+./list-repos.sh | overrepo -c workspace/overrepo.yaml import --sync   # also clone the new projects
 ```
 
-`projects` is written as a block map. Tag lists stay flow-style (`[collect, product, app]`). Existing values are kept unless you pass `--overwrite`. Projects are kept unless you pass `--prune`.
+`projects` is written as a block map; tag lists stay flow-style (`[frontend, app]`). Existing values are kept unless you pass `--overwrite`. Projects missing from the input are kept unless you pass `--prune`.
 
 ## Robustness
 
@@ -127,11 +171,11 @@ overrepo -c workspace/overrepo.yaml sync -p qualifio/collect/collect
 import { loadManifest, selectProjects, sync } from "overrepo";
 
 const manifest = await loadManifest({
-  cwd: "/path/to/qualifio-workspace",
+  cwd: "/path/to/acme",
   file: "workspace/overrepo.yaml",
 });
-const collect = selectProjects(manifest.projects, { tags: ["collect"] });
-await sync(manifest, { projects: collect });
+const backend = selectProjects(manifest.projects, { tags: ["backend"] });
+await sync(manifest, { projects: backend });
 ```
 
 ## Development

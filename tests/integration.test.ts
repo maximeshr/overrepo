@@ -137,8 +137,8 @@ describe("init", () => {
     git(real, "add", "-A");
     git(real, "commit", "-q", "-m", "init");
     git(real, "remote", "add", "origin", "file:///collect.git");
-    mkdirSync(path.join(hub, "qualifio"), { recursive: true });
-    symlinkSync(real, path.join(hub, "qualifio", "collect"), "dir");
+    mkdirSync(path.join(hub, "acme"), { recursive: true });
+    symlinkSync(real, path.join(hub, "acme", "collect"), "dir");
     const named = path.join(hub, "t3-abc");
     mkdirSync(named, { recursive: true });
     git(named, "init", "-q");
@@ -146,7 +146,7 @@ describe("init", () => {
 
     const init = await cli(hub, ["init", "--dry-run"]);
     expect(init.code).toBe(0);
-    expect(init.stdout).toContain("qualifio/collect:");
+    expect(init.stdout).toContain("acme/collect:");
     expect(init.stdout).toContain("url: file:///collect.git");
     expect(init.stdout).toContain("t3-abc:");
     expect(init.stdout).not.toMatch(/^ {2}\.:/m);
@@ -232,7 +232,7 @@ describe("meta-folder", () => {
       [
         "root: ..",
         "projects:",
-        "  qualifio/collect/collect:",
+        "  acme/collect/collect:",
         `    url: ${url}`,
         "    tags: [collect]",
         "",
@@ -242,13 +242,13 @@ describe("meta-folder", () => {
     const args = ["-c", "workspace/overrepo.yaml"];
     const synced = await cli(hub, [...args, "sync", "--tags", "collect"]);
     expect(synced.code).toBe(0);
-    expect(existsSync(path.join(hub, "qualifio/collect/collect/README.md"))).toBe(true);
+    expect(existsSync(path.join(hub, "acme/collect/collect/README.md"))).toBe(true);
     expect(existsSync(path.join(hub, ".gitignore"))).toBe(false);
 
     const listed = JSON.parse((await cli(hub, [...args, "list", "--json"])).stdout) as Array<{
       path: string;
     }>;
-    expect(listed.map((project) => project.path)).toEqual(["qualifio/collect/collect"]);
+    expect(listed.map((project) => project.path)).toEqual(["acme/collect/collect"]);
 
     const doctor = await cli(hub, [...args, "doctor", "--no-network", "--json"]);
     expect(doctor.code).toBe(0);
@@ -273,7 +273,7 @@ describe("context", () => {
         "summary:",
         "  outDir: aidd_docs/memory/internal",
         "projects:",
-        "  qualifio/collect/collect:",
+        "  acme/collect/collect:",
         `    url: ${url}`,
         "    tags: [collect]",
         "    desc: Collect",
@@ -282,11 +282,11 @@ describe("context", () => {
     );
     const args = ["-c", "workspace/overrepo.yaml"];
     expect((await cli(hub, [...args, "sync", "--tags", "collect"])).code).toBe(0);
-    const clone = path.join(hub, "qualifio/collect/collect");
+    const clone = path.join(hub, "acme/collect/collect");
     writeFileSync(path.join(clone, "README.md"), "# collect\n\nDIRTY body\n");
 
     expect((await cli(hub, [...args, "context"])).code).toBe(0);
-    const card = path.join(workspace, "aidd_docs/memory/internal/qualifio/collect/collect.md");
+    const card = path.join(workspace, "aidd_docs/memory/internal/acme/collect/collect.md");
     const index = path.join(workspace, "aidd_docs/memory/internal/index.md");
     expect(existsSync(index)).toBe(true);
     const text = readFileSync(card, "utf8");

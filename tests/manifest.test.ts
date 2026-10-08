@@ -53,8 +53,8 @@ root: ..
 summary:
   outDir: aidd_docs/memory/internal
 projects:
-  qualifio/collect/collect:
-    url: git@gitlab.example:qualifioapp/collect/collect.git
+  acme/collect/collect:
+    url: git@gitlab.example:acme/collect/collect.git
     tags: [collect]
 `,
       "/meta/workspace/overrepo.yaml",
@@ -62,8 +62,8 @@ projects:
     expect(manifest.root).toBe(path.resolve("/meta"));
     expect(manifest.manifestDir).toBe(path.resolve("/meta/workspace"));
     expect(manifest.projects[0]).toMatchObject({
-      path: "qualifio/collect/collect",
-      dir: path.resolve("/meta", ..."qualifio/collect/collect".split("/")),
+      path: "acme/collect/collect",
+      dir: path.resolve("/meta", ..."acme/collect/collect".split("/")),
     });
     expect(manifest.summary.outDir).toBe("aidd_docs/memory/internal");
     expect(manifest.summary.index).toBe("aidd_docs/memory/internal/index.md");
