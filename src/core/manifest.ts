@@ -180,7 +180,8 @@ function resolveManifest(
     readmeMaxChars: DEFAULT_SUMMARY.readmeMaxChars,
     treeMaxEntries: DEFAULT_SUMMARY.treeMaxEntries,
   };
-  const outDirAbs = path.resolve(manifestDir, ...outDir.split("/"));
+  // Lowercased like project paths, so `Context` and `context` collide on case-insensitive disks too.
+  const outDirAbs = path.resolve(manifestDir, ...outDir.split("/")).toLowerCase();
 
   const projects: Project[] = [];
   const byPath = new Map<string, string>();
@@ -206,10 +207,10 @@ function resolveManifest(
       byPath.set(pathKey, projectPath);
     }
     const projectDir = path.resolve(root, ...projectPath.split("/"));
-    if (!("error" in outDirResult) && isInsideDir(outDirAbs, projectDir)) {
+    if (!("error" in outDirResult) && isInsideDir(outDirAbs, projectDir.toLowerCase())) {
       issues.push({
         path: `projects.${name}`,
-        message: `path must not be inside summary.outDir ("${outDir}")`,
+        message: `path collides with summary.outDir ("${outDir}"); set summary.outDir to another directory`,
         ...locate(["projects", name]),
       });
     }

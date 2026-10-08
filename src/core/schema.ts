@@ -22,7 +22,7 @@ export const manifestSchema = z.strictObject({
   root: text.optional(),
   /**
    * Where repository summaries are written, relative to this file.
-   * Omitted, the directory is `ai/repos`.
+   * Omitted, the directory is `context`.
    */
   summary: z.strictObject({ outDir: text.optional() }).optional(),
   projects: z.record(identifier, projectSchema),

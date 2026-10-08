@@ -28,7 +28,7 @@ projects:
 `);
     expect(manifest.root).toBe(path.resolve("/meta"));
     expect(manifest.manifestDir).toBe(path.resolve("/meta"));
-    expect(manifest.summary).toMatchObject({ outDir: "ai/repos", index: "ai/repos/index.md" });
+    expect(manifest.summary).toMatchObject({ outDir: "context", index: "context/index.md" });
     expect(manifest.defaults).toMatchObject({ concurrency: 8, retries: 2 });
     const [billing, web] = manifest.projects;
     expect(billing).toMatchObject({
@@ -67,6 +67,20 @@ projects:
     });
     expect(manifest.summary.outDir).toBe("aidd_docs/memory/internal");
     expect(manifest.summary.index).toBe("aidd_docs/memory/internal/index.md");
+  });
+
+  it("rejects projects that collide with summary.outDir", () => {
+    const message =
+      'path collides with summary.outDir ("context"); set summary.outDir to another directory';
+    expect(issuesOf("projects:\n  context:\n    url: x\n")).toEqual([
+      expect.objectContaining({ path: "projects.context", message }),
+    ]);
+    expect(issuesOf("projects:\n  Context/api:\n    url: x\n")).toEqual([
+      expect.objectContaining({ path: "projects.Context/api", message }),
+    ]);
+    expect(() =>
+      parse("summary:\n  outDir: docs/repos\nprojects:\n  context:\n    url: x\n"),
+    ).not.toThrow();
   });
 
   it("reports unknown keys with their YAML path and line", () => {

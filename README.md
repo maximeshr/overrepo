@@ -66,14 +66,14 @@ projects:
     tags: [ops]
 ```
 
-| Key              | Meaning                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------- |
-| `root`           | Fleet root, relative to the manifest file. Omitted, it is the manifest's directory.      |
-| `projects`       | Map of path → project. The key is the clone path, relative to `root`.                    |
-| `url`            | Remote to clone. Required.                                                               |
-| `tags`           | Labels used by `--tags`. No whitespace or commas.                                        |
-| `desc`           | Free-text description, shown in summaries.                                               |
-| `summary.outDir` | Where `context` writes summaries, relative to the manifest file. Defaults to `ai/repos`. |
+| Key              | Meaning                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `root`           | Fleet root, relative to the manifest file. Omitted, it is the manifest's directory.     |
+| `projects`       | Map of path → project. The key is the clone path, relative to `root`.                   |
+| `url`            | Remote to clone. Required.                                                              |
+| `tags`           | Labels used by `--tags`. No whitespace or commas.                                       |
+| `desc`           | Free-text description, shown in summaries.                                              |
+| `summary.outDir` | Where `context` writes summaries, relative to the manifest file. Defaults to `context`. |
 
 A project path may not be absolute and may not climb above `root` (`../outside` is rejected).
 
