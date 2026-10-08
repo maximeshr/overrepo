@@ -10,7 +10,7 @@ npm install -g overrepo
 overrepo init                          # write a manifest from the repositories already on disk
 overrepo sync                          # clone everything that is missing
 overrepo status --dirty                # show repositories with local changes
-overrepo exec --tags api -- git pull   # run a command in a subset
+overrepo exec --tags backend -- git pull   # run a command in a subset
 ```
 
 Requires Node.js 24 or later, and `git` in `PATH`.
@@ -29,22 +29,30 @@ Requires Node.js 24 or later, and `git` in `PATH`.
 
 ## Layout
 
-The manifest lives in a git repository; the clones sit next to it. The directory you open does not have to be a repository itself.
+`overrepo.yaml` is a plain file: put it wherever suits you. By default the clones are laid out next to it, and neither the manifest's directory nor the fleet root needs to be a git repository.
 
 ```text
-acme/                         ← fleet root, not a git
-├── workspace/                ← the git that versions the manifest
-│   └── overrepo.yaml         ← root: ..
-├── apps/web/                 ← clone
-├── services/api/             ← clone
-└── infra/terraform/          ← clone
+acme/
+├── overrepo.yaml
+├── apps/web/            ← clone
+├── services/api/        ← clone
+└── infra/terraform/     ← clone
+```
+
+`root` decouples the two. Keep the manifest in a separate directory (a dotfiles repo, a shared config repo, or just a folder) and point `root` at the fleet:
+
+```text
+acme/
+├── config/
+│   └── overrepo.yaml    ← root: ..
+├── apps/web/
+└── services/api/
 ```
 
 ## Manifest
 
 ```yaml
-# workspace/overrepo.yaml
-root: ..
+# overrepo.yaml
 projects:
   apps/web:
     url: git@github.com:acme/web.git
@@ -69,7 +77,11 @@ projects:
 
 A project path may not be absolute and may not climb above `root` (`../outside` is rejected).
 
-`overrepo.yaml` is searched from the current directory upward; `-c <file>` points at it explicitly.
+`overrepo.yaml` is searched from the current directory upward. When it is not in a parent directory, point at it with `-c`:
+
+```sh
+overrepo -c config/overrepo.yaml sync
+```
 
 ## Commands
 
@@ -152,8 +164,8 @@ A script you own (querying your Git hosting API, for example) can produce the pr
 `name` is the path. A different `path` field is rejected. Unknown fields are ignored.
 
 ```sh
-./list-repos.sh | overrepo -c workspace/overrepo.yaml import
-./list-repos.sh | overrepo -c workspace/overrepo.yaml import --sync   # also clone the new projects
+./list-repos.sh | overrepo import
+./list-repos.sh | overrepo import --sync   # also clone the new projects
 ```
 
 `projects` is written as a block map; tag lists stay flow-style (`[frontend, app]`). Existing values are kept unless you pass `--overwrite`. Projects missing from the input are kept unless you pass `--prune`.
@@ -172,7 +184,6 @@ import { loadManifest, selectProjects, sync } from "overrepo";
 
 const manifest = await loadManifest({
   cwd: "/path/to/acme",
-  file: "workspace/overrepo.yaml",
 });
 const backend = selectProjects(manifest.projects, { tags: ["backend"] });
 await sync(manifest, { projects: backend });
