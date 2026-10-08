@@ -1,6 +1,6 @@
 import { generateContext } from "../../context/generate.ts";
 import { contextOf, load, select, withSelection, type SelectionOptions } from "../options.ts";
-import { json } from "../output.ts";
+import { json, progressBar } from "../output.ts";
 import type { Register } from "./types.ts";
 
 export const registerContext: Register = (program, run, io) => {
@@ -18,11 +18,14 @@ export const registerContext: Register = (program, run, io) => {
         command,
       ) => {
         const manifest = await load(contextOf(io, command));
+        const progress = progressBar(io, "analyzing");
+        progress.update(0, manifest.projects.length);
         const report = await generateContext(manifest, {
           projects: select(manifest, options),
           check: options.check,
           prune: options.prune,
-        });
+          onProgress: (done, total, project) => progress.update(done, total, project.name),
+        }).finally(() => progress.clear());
         const exitCode = options.check && report.stale ? 1 : 0;
 
         if (options.json) {

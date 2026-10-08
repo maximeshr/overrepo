@@ -28,6 +28,8 @@ export interface ContextOptions {
   prune?: boolean;
   concurrency?: number;
   detectors?: Detector[];
+  /** Called each time a project has been analyzed. */
+  onProgress?: (done: number, total: number, project: Project) => void;
 }
 
 export interface ContextReport {
@@ -131,9 +133,19 @@ export async function generateContext(
     );
 
   const limit = pLimit(Math.max(1, options.concurrency ?? manifest.defaults.concurrency));
+  let done = 0;
   const analyses = await Promise.all(
     manifest.projects.map((project) =>
-      limit(() => analyzeProject(project, summary.include, options.detectors, "origin/HEAD")),
+      limit(async () => {
+        const analysis = await analyzeProject(
+          project,
+          summary.include,
+          options.detectors,
+          "origin/HEAD",
+        );
+        options.onProgress?.(++done, manifest.projects.length, project);
+        return analysis;
+      }),
     ),
   );
   const dependencies = internalDependencies(analyses, cardOf);
