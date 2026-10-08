@@ -146,7 +146,9 @@ Summaries are read from each clone's `origin/HEAD`, so a dirty checkout does not
 
 ## Importing a catalogue
 
-A script you own (querying your Git hosting API, for example) can produce the project list. overrepo does not talk to any hosting provider itself.
+`import` fills the manifest from a JSON list of repositories, read from stdin or `--file`. It is meant for large fleets: rather than writing every entry by hand, generate the list from wherever your repositories are already listed (GitHub, GitLab, an internal catalogue). overrepo does not talk to any hosting provider itself.
+
+The expected input:
 
 ```json
 {
@@ -161,14 +163,24 @@ A script you own (querying your Git hosting API, for example) can produce the pr
 }
 ```
 
-`name` is the path. A different `path` field is rejected. Unknown fields are ignored.
+`name` is the path (the manifest key). A different `path` field is rejected. Unknown fields are ignored.
+
+For example, to import every repository of a GitHub organization with the [GitHub CLI](https://cli.github.com) and [jq](https://jqlang.org), using repository topics as tags:
 
 ```sh
-./list-repos.sh | overrepo import
-./list-repos.sh | overrepo import --sync   # also clone the new projects
+gh repo list acme --limit 1000 --json name,sshUrl,description,repositoryTopics \
+  | jq '{projects: map({
+      name: .name,
+      url: .sshUrl,
+      desc: .description,
+      tags: ((.repositoryTopics // []) | map(.name))
+    })}' \
+  | overrepo import --sync
 ```
 
-`projects` is written as a block map; tag lists stay flow-style (`[frontend, app]`). Existing values are kept unless you pass `--overwrite`. Projects missing from the input are kept unless you pass `--prune`.
+`--sync` also clones the projects just added; `--dry-run` shows what would change without writing.
+
+`projects` is written as a block map; tag lists stay flow-style (`[frontend, app]`). Existing values are kept unless you pass `--overwrite`. Projects missing from the input are kept unless you pass `--prune`, so you can re-run the same command to pick up new repositories.
 
 ## Robustness
 
