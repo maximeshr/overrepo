@@ -10,6 +10,8 @@ export interface Io {
   readStdin(): Promise<string>;
   stdinIsTTY: boolean;
   stdoutIsTTY: boolean;
+  /** Progress bars are drawn on stderr only when it is a terminal. */
+  stderrIsTTY: boolean;
   colors: Colors;
   /** Aborted on Ctrl+C. */
   signal: AbortSignal;
@@ -28,6 +30,7 @@ export function processIo(signal: AbortSignal): Io {
     },
     stdinIsTTY: Boolean(process.stdin.isTTY),
     stdoutIsTTY: Boolean(process.stdout.isTTY),
+    stderrIsTTY: Boolean(process.stderr.isTTY),
     colors: picocolors.createColors(picocolors.isColorSupported),
     signal,
   };

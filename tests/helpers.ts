@@ -76,6 +76,7 @@ export async function cli(cwd: string, args: string[], stdin = ""): Promise<Test
     readStdin: async () => stdin,
     stdinIsTTY: false,
     stdoutIsTTY: false,
+    stderrIsTTY: false,
     colors: picocolors.createColors(false),
     signal: new AbortController().signal,
   };

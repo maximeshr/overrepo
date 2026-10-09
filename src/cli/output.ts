@@ -97,3 +97,30 @@ export function printSummary(
 export function warn(io: Io, message: string): void {
   io.error(`${io.colors.yellow("warning")} ${message}\n`);
 }
+
+export interface ProgressBar {
+  update(done: number, total: number, label?: string): void;
+  /** Erases the bar so the next output starts on a clean line. */
+  clear(): void;
+}
+
+/** Single-line bar redrawn in place on stderr; a no-op when stderr is not a terminal. */
+export function progressBar(io: Io, title: string, width = 24): ProgressBar {
+  if (!io.stderrIsTTY) return { update: () => {}, clear: () => {} };
+  const { colors } = io;
+  let drawn = false;
+  return {
+    update(done, total, label = "") {
+      const ratio = total > 0 ? Math.min(1, done / total) : 1;
+      const filled = Math.round(ratio * width);
+      const bar = colors.cyan("█".repeat(filled)) + colors.dim("░".repeat(width - filled));
+      const name = label.length > 32 ? `${label.slice(0, 31)}…` : label;
+      io.error(`\r\u001B[2K${title} ${bar} ${done}/${total} ${colors.dim(name)}`);
+      drawn = true;
+    },
+    clear() {
+      if (drawn) io.error("\r\u001B[2K");
+      drawn = false;
+    },
+  };
+}
