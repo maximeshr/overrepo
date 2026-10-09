@@ -44,7 +44,7 @@ export interface Manifest {
 }
 
 export const DEFAULT_SUMMARY = {
-  outDir: "ai/repos",
+  outDir: "context",
   include: [
     "README.md",
     "AGENTS.md",
