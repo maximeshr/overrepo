@@ -212,7 +212,9 @@ vp test
 vp pack
 ```
 
-Releases use [changesets](https://github.com/changesets/changesets).
+Releases use [changesets](https://github.com/changesets/changesets). Describe each user-facing change with `vp exec changeset`. On `main`, the Release workflow opens a "Version Packages" pull request that bumps the version and updates `CHANGELOG.md`; merging it publishes to npm and creates the `vX.Y.Z` tag.
+
+Never edit the version in `package.json` or push release tags by hand: `vp run check:version` fails CI and the Release workflow when the version is neither published nor in `CHANGELOG.md`.
 
 ## License
 

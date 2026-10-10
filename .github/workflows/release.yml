@@ -23,11 +23,12 @@ jobs:
           cache: true
       - run: vp install
       - run: vp check
+      - run: vp run check:version
       - run: vp test
       - uses: changesets/action@v2.1.2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          version-script: vp exec changeset version
+          version-script: vp run version-packages
           publish-script: vp run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
