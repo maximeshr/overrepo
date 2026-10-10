@@ -23,6 +23,6 @@ export default defineConfig({
     },
   },
   fmt: {
-    ignorePatterns: ["dist/**", "pnpm-lock.yaml"],
+    ignorePatterns: ["dist/**", "pnpm-lock.yaml", "CHANGELOG.md"],
   },
 });
