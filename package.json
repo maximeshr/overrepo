@@ -1,6 +1,6 @@
 {
   "name": "overrepo",
-  "version": "0.0.4",
+  "version": "0.0.3",
   "description": "Manage a fleet of git repositories from one manifest.",
   "keywords": [
     "cli",
@@ -40,6 +40,8 @@
     "check": "vp check",
     "prepublishOnly": "vp run build",
     "changeset": "changeset",
+    "check:version": "node scripts/check-version.mjs",
+    "version-packages": "changeset version",
     "release": "vp pack && changeset publish"
   },
   "dependencies": {
