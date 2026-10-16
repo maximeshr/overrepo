@@ -1,5 +1,11 @@
 # overrepo
 
+## 0.0.5
+
+### Patch Changes
+
+- 3dcc731: Update dependencies: execa 10.1.1, zod 4.6.7.
+
 ## 0.0.4
 
 ### Patch Changes
