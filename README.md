@@ -13,7 +13,7 @@ overrepo status --dirty                # show repositories with local changes
 overrepo exec --tags backend -- git pull   # run a command in a subset
 ```
 
-Requires Node.js 24 or later, and `git` in `PATH`.
+Requires Node.js 26 or later, and `git` in `PATH`.
 
 ## Contents
 
