@@ -34,3 +34,8 @@ jobs:
       - run: vp test
       - run: vp pack
       - run: node dist/cli.mjs --help
+      # Ubuntu only: the Windows job is continue-on-error, so a failure
+      # there would not block the pull request. pnpm comes from setup-vp.
+      - name: Audit high and critical vulnerabilities
+        if: runner.os == 'Linux'
+        run: pnpm audit --audit-level=high
