@@ -1,5 +1,15 @@
 # overrepo
 
+## 0.1.0
+
+### Minor Changes
+
+- 2580a4a: Require Node.js 26 or later. Node.js 24 is no longer supported.
+
+### Patch Changes
+
+- 3dcc731: Update dependencies: execa 10.1.1, zod 4.6.7.
+
 ## 0.0.4
 
 ### Patch Changes
