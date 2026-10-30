@@ -66,11 +66,11 @@
     },
     "runtime": {
       "name": "node",
-      "version": "24.22.0",
+      "version": "26.13.0",
       "onFail": "download"
     }
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=26"
   }
 }

@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: voidzero-dev/setup-vp@v1.21.1
         with:
-          node-version: "24" # current LTS
+          node-version: "26" # current LTS
           cache: true
       - run: vp install
       - run: pnpm audit --audit-level=high

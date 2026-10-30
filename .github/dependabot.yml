@@ -9,7 +9,8 @@ updates:
       prefix: chore
       include: scope
     ignore:
-      # overrepo stays on Node 24 LTS.
+      # Runtime is Node 26 LTS. @types/node majors stay out of this
+      # change; bump them in a dedicated dependency pull request.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
