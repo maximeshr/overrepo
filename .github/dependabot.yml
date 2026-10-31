@@ -9,8 +9,8 @@ updates:
       prefix: chore
       include: scope
     ignore:
-      # Runtime is Node 26 LTS. @types/node majors stay out of this
-      # change; bump them in a dedicated dependency pull request.
+      # The @types/node major follows the engines.node minimum (22), not the
+      # dev runtime. Raise both together, by hand.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
