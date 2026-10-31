@@ -13,7 +13,7 @@ overrepo status --dirty                # show repositories with local changes
 overrepo exec --tags backend -- git pull   # run a command in a subset
 ```
 
-Requires Node.js 26 or later, and `git` in `PATH`.
+Requires Node.js 22.12 or later, and `git` in `PATH`.
 
 ## Contents
 
@@ -211,6 +211,10 @@ vp check
 vp test
 vp pack
 ```
+
+Development uses Node.js 26 (pinned in `devEngines`). CI also runs the tests on Node.js 22 and 24, and starts the built CLI on Node.js 22.12, the minimum in `engines`.
+
+`vp run check:package` (after `vp pack`) checks the tarball npm receives with [publint](https://publint.dev) and [Are the Types Wrong?](https://arethetypeswrong.github.io). CI and the Release workflow run it before anything is published.
 
 CI runs `pnpm audit --audit-level=high` on every pull request, every push to `main`, and weekly, because Dependabot does not raise alerts on a pnpm 12 lockfile.
 

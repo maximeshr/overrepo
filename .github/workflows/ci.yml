@@ -34,8 +34,36 @@ jobs:
       - run: vp test
       - run: vp pack
       - run: node dist/cli.mjs --help
+      # Checks the tarball npm receives: package.json, files and types.
+      - name: Check the published package
+        if: runner.os == 'Linux'
+        run: vp run check:package
       # Ubuntu only: the Windows job is continue-on-error, so a failure
       # there would not block the pull request. pnpm comes from setup-vp.
       - name: Audit high and critical vulnerabilities
         if: runner.os == 'Linux'
         run: pnpm audit --audit-level=high
+
+  # The dev runtime is pinned to Node 26 (devEngines), but the package supports
+  # every version allowed by engines.node. `vp env exec --node` overrides the pin.
+  node-compat:
+    name: node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 (latest) runs the toolchain; vite-plus itself needs 22.18 or later.
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          node-version: "26" # current LTS
+          cache: true
+      - run: vp install
+      - run: vp pack
+      - run: vp env exec --node ${{ matrix.node }} vp test
+      # engines.node minimum: the built CLI must start on it.
+      - name: Smoke test on the minimum supported Node
+        if: matrix.node == '22'
+        run: vp env exec --node 22.12.0 node dist/cli.mjs --help
