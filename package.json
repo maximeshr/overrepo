@@ -40,8 +40,7 @@
     "check:version": "quality-gate check-version",
     "release": "vp pack && vp run check:package && changeset publish",
     "check:package": "quality-gate check-package",
-    "prepare": "vp config",
-    "version-packages": "changeset version"
+    "prepare": "vp config"
   },
   "dependencies": {
     "commander": "^15.0.0",
