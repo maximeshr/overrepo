@@ -5,7 +5,7 @@ import { isRecord } from "./util.ts";
 const COMPOSE_FILES = ["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"];
 
 /** Base images of a Dockerfile, ignoring references to earlier build stages. */
-export function dockerBaseImages(dockerfile: string): string[] {
+function dockerBaseImages(dockerfile: string): string[] {
   const stages = new Set<string>();
   const images: string[] = [];
   for (const line of dockerfile.split("\n")) {

@@ -62,7 +62,7 @@ function hasCustomSshCommand(): Promise<boolean> {
  * Environment that guarantees git never waits for interactive input:
  * no credential prompt, and SSH in batch mode unless the user customized SSH.
  */
-export async function nonInteractiveEnv(): Promise<Record<string, string>> {
+async function nonInteractiveEnv(): Promise<Record<string, string>> {
   const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
   if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !(await hasCustomSshCommand())) {
     env.GIT_SSH_COMMAND = "ssh -o BatchMode=yes";
@@ -71,7 +71,7 @@ export async function nonInteractiveEnv(): Promise<Record<string, string>> {
 }
 
 /** Runs git and returns trimmed stdout. Throws `GitError` on failure. */
-export async function git(args: string[], options: GitRunOptions = {}): Promise<string> {
+async function git(args: string[], options: GitRunOptions = {}): Promise<string> {
   const result = await execa("git", args, {
     cwd: options.cwd,
     timeout: options.timeout,

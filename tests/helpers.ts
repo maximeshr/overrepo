@@ -37,7 +37,7 @@ export function git(cwd: string, ...args: string[]): string {
   }).trim();
 }
 
-export function writeFiles(dir: string, files: Record<string, string>): void {
+function writeFiles(dir: string, files: Record<string, string>): void {
   for (const [file, content] of Object.entries(files)) {
     const target = path.join(dir, file);
     mkdirSync(path.dirname(target), { recursive: true });

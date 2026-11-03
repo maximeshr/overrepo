@@ -5,7 +5,7 @@ import { isRecord } from "./util.ts";
 const MAKEFILES = ["Makefile", "makefile", "GNUmakefile"];
 
 /** Explicit, non-special targets of a Makefile (`build:`, `test: deps`), in file order. */
-export function makeTargets(makefile: string): string[] {
+function makeTargets(makefile: string): string[] {
   const targets: string[] = [];
   for (const line of makefile.split("\n")) {
     const match = /^([A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/.exec(line);

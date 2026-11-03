@@ -10,7 +10,7 @@ import { normalizeGitUrl } from "./urls.ts";
  * Import format (JSON). Either an array of projects or `{ "projects": [...] }`.
  * `name` is the project path (the manifest key). Unknown fields are ignored.
  */
-export const importProjectSchema = z.object({
+const importProjectSchema = z.object({
   name: z
     .string()
     .min(1)

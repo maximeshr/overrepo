@@ -17,7 +17,7 @@ const TRANSIENT_PATTERNS = [
 ];
 
 /** Network hiccups worth retrying; auth failures and missing repositories are not. */
-export function isTransientGitError(error: unknown): boolean {
+function isTransientGitError(error: unknown): boolean {
   if (!(error instanceof GitError) || error.aborted) return false;
   if (error.timedOut) return true;
   return TRANSIENT_PATTERNS.some((pattern) => pattern.test(error.stderr));

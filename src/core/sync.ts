@@ -32,7 +32,7 @@ export interface SyncReport {
   results: ProjectResult<SyncAction>[];
 }
 
-export function partialCloneDir(project: Project): string {
+function partialCloneDir(project: Project): string {
   return path.join(path.dirname(project.dir), `.${path.basename(project.dir)}${PARTIAL_SUFFIX}`);
 }
 

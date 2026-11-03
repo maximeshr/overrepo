@@ -5,7 +5,7 @@ import type { Manifest, Project } from "../core/model.ts";
 import { selectProjects, type Selection } from "../core/selection.ts";
 import type { Io } from "./io.ts";
 
-export interface GlobalOptions {
+interface GlobalOptions {
   cwd?: string;
   config?: string;
 }
@@ -26,7 +26,7 @@ export async function load(context: Context): Promise<Manifest> {
   return loadManifest({ cwd: context.cwd, file: context.config });
 }
 
-export const list = (value: string, previous: string[] | undefined): string[] => [
+const list = (value: string, previous: string[] | undefined): string[] => [
   ...(previous ?? []),
   ...value
     .split(",")
@@ -70,7 +70,7 @@ export function withSelection(command: Command): Command {
     .option("-p, --projects <paths>", "projects by path (the manifest key)", list);
 }
 
-export function selection(options: SelectionOptions): Selection {
+function selection(options: SelectionOptions): Selection {
   return {
     all: options.all,
     tags: options.tags,
