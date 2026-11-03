@@ -1,89 +1,40 @@
 # overrepo
 
+[![CI](https://github.com/maximeshr/overrepo/actions/workflows/ci.yml/badge.svg?branch=canary)](https://github.com/maximeshr/overrepo/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/overrepo)](https://www.npmjs.com/package/overrepo)
+
 Manage a fleet of git repositories from one manifest.
 
 Describe your repositories once in `overrepo.yaml`, then clone, update, inspect and script them together: by tag, by path, or all at once.
 
+## Table of contents
+
+- [Install](#install)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Robustness](#robustness)
+- [API](#api)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Install
+
 ```sh
 npm install -g overrepo
+```
 
+Requires Node.js 22.12 or later, and `git` in `PATH`.
+
+## Usage
+
+```sh
 overrepo init                          # write a manifest from the repositories already on disk
 overrepo sync                          # clone everything that is missing
 overrepo status --dirty                # show repositories with local changes
 overrepo exec --tags backend -- git pull   # run a command in a subset
 ```
 
-Requires Node.js 22.12 or later, and `git` in `PATH`.
-
-## Contents
-
-- [Layout](#layout)
-- [Manifest](#manifest)
-- [Commands](#commands)
-- [Selecting projects](#selecting-projects)
-- [Repository summaries](#repository-summaries)
-- [Importing a catalogue](#importing-a-catalogue)
-- [Robustness](#robustness)
-- [Programmatic API](#programmatic-api)
-- [Development](#development)
-
-## Layout
-
-`overrepo.yaml` is a plain file: put it wherever suits you. By default the clones are laid out next to it, and neither the manifest's directory nor the fleet root needs to be a git repository.
-
-```text
-acme/
-├── overrepo.yaml
-├── apps/web/            ← clone
-├── services/api/        ← clone
-└── infra/terraform/     ← clone
-```
-
-`root` decouples the two. Keep the manifest in a separate directory (a dotfiles repo, a shared config repo, or just a folder) and point `root` at the fleet:
-
-```text
-acme/
-├── config/
-│   └── overrepo.yaml    ← root: ..
-├── apps/web/
-└── services/api/
-```
-
-## Manifest
-
-```yaml
-# overrepo.yaml
-projects:
-  apps/web:
-    url: git@github.com:acme/web.git
-    tags: [frontend, app]
-    desc: Customer-facing web app
-  services/api:
-    url: git@github.com:acme/api.git
-    tags: [backend, app]
-  infra/terraform:
-    url: git@github.com:acme/terraform.git
-    tags: [ops]
-```
-
-| Key              | Meaning                                                                                 |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `root`           | Fleet root, relative to the manifest file. Omitted, it is the manifest's directory.     |
-| `projects`       | Map of path → project. The key is the clone path, relative to `root`.                   |
-| `url`            | Remote to clone. Required.                                                              |
-| `tags`           | Labels used by `--tags`. No whitespace or commas.                                       |
-| `desc`           | Free-text description, shown in summaries.                                              |
-| `summary.outDir` | Where `context` writes summaries, relative to the manifest file. Defaults to `context`. |
-
-A project path may not be absolute and may not climb above `root` (`../outside` is rejected).
-
-`overrepo.yaml` is searched from the current directory upward. When it is not in a parent directory, point at it with `-c`:
-
-```sh
-overrepo -c config/overrepo.yaml sync
-```
-
-## Commands
+### Commands
 
 | Command           | What it does                                                                                                                                                                                                                 |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -100,7 +51,7 @@ Global options: `-C <dir>`, `-c <file>`, `-v`, `-h`.
 
 `sync` clones the remote default branch. It never writes a `.gitignore`: the fleet root is not necessarily a git.
 
-### Exit codes
+#### Exit codes
 
 | Code  | Meaning                      |
 | ----- | ---------------------------- |
@@ -109,7 +60,7 @@ Global options: `-C <dir>`, `-c <file>`, `-v`, `-h`.
 | `2`   | usage or configuration error |
 | `130` | interrupted (Ctrl+C)         |
 
-## Selecting projects
+### Selecting projects
 
 `exec`, `status`, `list`, `sync` and `context` accept:
 
@@ -133,7 +84,7 @@ overrepo sync -p apps/web,services/api
 - Commands receive `OVERREPO_ROOT`, `OVERREPO_PROJECT` and `OVERREPO_PROJECT_PATH` (the last two are the project path).
 - Projects that are not cloned are skipped.
 
-## Repository summaries
+### Repository summaries
 
 `context` writes one Markdown summary per repository plus an `index.md`, under `summary.outDir` next to the manifest. Point `summary.outDir` wherever you want them versioned, for example to give AI assistants an overview of the whole fleet.
 
@@ -144,7 +95,7 @@ summary:
 
 Summaries are read from each clone's `origin/HEAD`, so a dirty checkout does not change them. In CI, `overrepo context --check` fails when a summary is out of date.
 
-## Importing a catalogue
+### Importing a catalogue
 
 `import` fills the manifest from a JSON list of repositories, read from stdin or `--file`. It is meant for large fleets: rather than writing every entry by hand, generate the list from wherever your repositories are already listed (GitHub, GitLab, an internal catalogue). overrepo does not talk to any hosting provider itself.
 
@@ -182,6 +133,64 @@ gh repo list acme --limit 1000 --json name,sshUrl,description,repositoryTopics \
 
 `projects` is written as a block map; tag lists stay flow-style (`[frontend, app]`). Existing values are kept unless you pass `--overwrite`. Projects missing from the input are kept unless you pass `--prune`, so you can re-run the same command to pick up new repositories.
 
+## Configuration
+
+### Layout
+
+`overrepo.yaml` is a plain file: put it wherever suits you. By default the clones are laid out next to it, and neither the manifest's directory nor the fleet root needs to be a git repository.
+
+```text
+acme/
+├── overrepo.yaml
+├── apps/web/            ← clone
+├── services/api/        ← clone
+└── infra/terraform/     ← clone
+```
+
+`root` decouples the two. Keep the manifest in a separate directory (a dotfiles repo, a shared config repo, or just a folder) and point `root` at the fleet:
+
+```text
+acme/
+├── config/
+│   └── overrepo.yaml    ← root: ..
+├── apps/web/
+└── services/api/
+```
+
+### Manifest
+
+```yaml
+# overrepo.yaml
+projects:
+  apps/web:
+    url: git@github.com:acme/web.git
+    tags: [frontend, app]
+    desc: Customer-facing web app
+  services/api:
+    url: git@github.com:acme/api.git
+    tags: [backend, app]
+  infra/terraform:
+    url: git@github.com:acme/terraform.git
+    tags: [ops]
+```
+
+| Key              | Meaning                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `root`           | Fleet root, relative to the manifest file. Omitted, it is the manifest's directory.     |
+| `projects`       | Map of path → project. The key is the clone path, relative to `root`.                   |
+| `url`            | Remote to clone. Required.                                                              |
+| `tags`           | Labels used by `--tags`. No whitespace or commas.                                       |
+| `desc`           | Free-text description, shown in summaries.                                              |
+| `summary.outDir` | Where `context` writes summaries, relative to the manifest file. Defaults to `context`. |
+
+A project path may not be absolute and may not climb above `root` (`../outside` is rejected).
+
+`overrepo.yaml` is searched from the current directory upward. When it is not in a parent directory, point at it with `-c`:
+
+```sh
+overrepo -c config/overrepo.yaml sync
+```
+
 ## Robustness
 
 - One repository failing never stops the others.
@@ -189,7 +198,7 @@ gh repo list acme --limit 1000 --json name,sshUrl,description,repositoryTopics \
 - Per-operation timeout and retries with exponential backoff on transient network errors.
 - Clones land in `.<name>.overrepo-partial` and move into place only when complete.
 
-## Programmatic API
+## API
 
 ```ts
 import { loadManifest, selectProjects, sync } from "overrepo";
@@ -201,7 +210,11 @@ const backend = selectProjects(manifest.projects, { tags: ["backend"] });
 await sync(manifest, { projects: backend });
 ```
 
-## Development
+## Contributing
+
+Pull requests target `canary`. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Development
 
 The toolchain is [Vite+](https://viteplus.dev) (`vp`). Dependencies are managed with [pnpm](https://pnpm.io).
 
@@ -224,4 +237,4 @@ Never edit the version in `package.json` or push release tags by hand: `vp run c
 
 ## License
 
-MIT
+[MIT](LICENSE) © Maxime Sahroui
