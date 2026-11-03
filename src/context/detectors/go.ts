@@ -13,7 +13,7 @@ const FRAMEWORKS = [
 ] as const;
 
 /** Parses the `module`, `go` and `require` directives of a go.mod file. */
-export function parseGoMod(text: string): { module?: string; go?: string; requires: string[] } {
+function parseGoMod(text: string): { module?: string; go?: string; requires: string[] } {
   const result: { module?: string; go?: string; requires: string[] } = { requires: [] };
   let inRequire = false;
   for (const raw of text.split("\n")) {

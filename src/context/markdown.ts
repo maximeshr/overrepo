@@ -1,6 +1,6 @@
-export const MANUAL_BEGIN = "<!-- overrepo:manual -->";
-export const MANUAL_END = "<!-- /overrepo:manual -->";
-export const DEFAULT_MANUAL_BODY =
+const MANUAL_BEGIN = "<!-- overrepo:manual -->";
+const MANUAL_END = "<!-- /overrepo:manual -->";
+const DEFAULT_MANUAL_BODY =
   "<!-- Human notes go here: this block is kept as-is when the file is regenerated. -->";
 
 /** Inline code span that survives backticks in the content. */
@@ -29,7 +29,7 @@ export function linkTarget(relative: string): string {
 }
 
 /** Neutralizes overrepo markers inside copied content so they cannot be mistaken for real ones. */
-export function neutralizeMarkers(text: string): string {
+function neutralizeMarkers(text: string): string {
   return text.replaceAll("overrepo:manual", "overrepo-manual");
 }
 

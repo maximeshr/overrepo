@@ -51,7 +51,7 @@ async function readIfExists(file: string): Promise<string | undefined> {
 }
 
 /** Links projects through published package names and git URLs found in dependency specs. */
-export function internalDependencies(
+function internalDependencies(
   analyses: Analysis[],
   cardOf: (project: Project) => string,
 ): Map<string, { uses: DependencyLink[]; usedBy: DependencyLink[] }> {

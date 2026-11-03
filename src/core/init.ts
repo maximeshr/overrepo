@@ -48,7 +48,7 @@ async function readDescription(dir: string): Promise<string | undefined> {
 }
 
 /** Builds the manifest document with flow-style tag lists and a header comment. */
-export function createManifestDocument(manifest: Record<string, unknown>): Document {
+function createManifestDocument(manifest: Record<string, unknown>): Document {
   const doc = new Document(manifest);
   doc.commentBefore = HEADER;
   const projects = doc.get("projects");

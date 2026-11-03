@@ -8,7 +8,7 @@ const identifier = z
   .min(1, "must not be empty")
   .regex(/^[^\s,]+$/, "must not contain whitespace or commas");
 
-export const projectSchema = z.strictObject({
+const projectSchema = z.strictObject({
   url: text,
   desc: z.string().optional(),
   tags: z.array(identifier).optional(),
@@ -29,4 +29,3 @@ export const manifestSchema = z.strictObject({
 });
 
 export type RawManifest = z.output<typeof manifestSchema>;
-export type RawProject = z.output<typeof projectSchema>;

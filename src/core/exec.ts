@@ -11,7 +11,7 @@ import {
   type RunEvent,
 } from "./runner.ts";
 
-export type OutputStream = "stdout" | "stderr";
+type OutputStream = "stdout" | "stderr";
 
 export interface OutputLine {
   stream: OutputStream;

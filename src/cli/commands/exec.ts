@@ -38,7 +38,7 @@ function withExecOptions(command: Command): Command {
 }
 
 /** Runs one command in each selected project. Returns the exit code. */
-export async function runInProjects(
+async function runInProjects(
   io: Io,
   manifest: Manifest,
   projects: Project[],

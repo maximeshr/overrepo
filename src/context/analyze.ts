@@ -4,7 +4,7 @@ import { defaultDetectors } from "./detectors/index.ts";
 import { openRepoFiles } from "./repo-files.ts";
 import type { Detection, Detector, PackageId, Script } from "./types.ts";
 
-export const AGENT_FILES = [
+const AGENT_FILES = [
   "AGENTS.md",
   "CLAUDE.md",
   "GEMINI.md",
@@ -13,7 +13,7 @@ export const AGENT_FILES = [
 ];
 const README_PATTERN = /^readme(\.(md|markdown|mdx|txt|rst))?$/i;
 
-export interface Stack {
+interface Stack {
   languages: string[];
   frameworks: string[];
   packageManagers: string[];

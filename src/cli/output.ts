@@ -5,7 +5,7 @@ import type { Colors, Io } from "./io.ts";
 // oxlint-disable-next-line no-control-regex
 const ANSI = /\u001B\[[0-9;]*m/g;
 
-export function visibleLength(text: string): number {
+function visibleLength(text: string): number {
   return text.replace(ANSI, "").length;
 }
 
@@ -36,7 +36,7 @@ export function json(io: Io, value: unknown): void {
   io.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
-export function statusIcon(colors: Colors, status: ResultStatus): string {
+function statusIcon(colors: Colors, status: ResultStatus): string {
   if (status === "ok") return colors.green("✔");
   if (status === "failed") return colors.red("✖");
   return colors.dim("○");

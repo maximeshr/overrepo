@@ -32,7 +32,7 @@ interface Limits {
 
 const MAX_SCRIPT_COMMAND = 120;
 
-export function frontmatter(data: Record<string, unknown>): string {
+function frontmatter(data: Record<string, unknown>): string {
   const doc = new Document(data);
   for (const key of Object.keys(data)) {
     const node = doc.get(key, true);
