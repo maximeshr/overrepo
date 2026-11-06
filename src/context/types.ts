@@ -12,12 +12,28 @@ export interface PackageId {
   name: string;
 }
 
+/**
+ * A tool version as one file declares it, e.g. `{ name: "node", version: "20.11.0", source: ".nvmrc" }`.
+ * `version` is the raw value (a pin or a range) and is `undefined` when the tool is known but its
+ * version is not declared anywhere (only a lockfile, or a default).
+ */
+export interface VersionSpec {
+  name: string;
+  version: string | undefined;
+  /** Where it was read: a file (`.nvmrc`), a JSON field (`package.json#engines.node`), or `default`. */
+  source: string;
+}
+
 export interface Detection {
   languages?: string[];
   frameworks?: string[];
   packageManagers?: string[];
   /** Runtime constraints, e.g. `Node >=20`, `PHP ^8.2`. */
   runtimes?: string[];
+  /** Structured runtime versions, one entry per declaring source. */
+  runtimeVersions?: VersionSpec[];
+  /** Structured package manager versions, one entry per declaring source. */
+  packageManagerVersions?: VersionSpec[];
   /** Tooling worth knowing: test runners, containers, CI. */
   tools?: string[];
   scripts?: Script[];

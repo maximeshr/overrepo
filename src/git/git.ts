@@ -248,3 +248,32 @@ export async function readGitFile(
     return undefined;
   }
 }
+
+export interface CommitInfo {
+  /** Full commit hash. */
+  sha: string;
+  /** First 7 characters of `sha` (fixed length, unlike `%h`, so cards stay stable). */
+  shortSha: string;
+  /** Committer date in UTC, ISO 8601 (`2026-01-31T09:15:00.000Z`). */
+  date: string;
+}
+
+/** The commit `ref` points to, or `undefined` when the revision is missing. */
+export async function commitInfo(
+  dir: string,
+  ref: string,
+  options: GitRunOptions = {},
+): Promise<CommitInfo | undefined> {
+  try {
+    const output = await git(["log", "-1", "--format=%H %cI", ref, "--"], {
+      ...options,
+      cwd: dir,
+    });
+    const [sha = "", iso = ""] = output.trim().split(" ");
+    const time = Date.parse(iso);
+    if (!/^[0-9a-f]{7,}$/.test(sha) || Number.isNaN(time)) return undefined;
+    return { sha, shortSha: sha.slice(0, 7), date: new Date(time).toISOString() };
+  } catch {
+    return undefined;
+  }
+}

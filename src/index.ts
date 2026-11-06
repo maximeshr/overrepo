@@ -56,4 +56,12 @@ export {
 } from "./context/generate.ts";
 export { analyzeProject, type Analysis } from "./context/analyze.ts";
 export { defaultDetectors } from "./context/detectors/index.ts";
-export type { Detection, Detector, PackageId, RepoFiles, Script } from "./context/types.ts";
+export type {
+  Detection,
+  Detector,
+  PackageId,
+  RepoFiles,
+  Script,
+  VersionSpec,
+} from "./context/types.ts";
+export type { CommitInfo } from "./git/git.ts";
