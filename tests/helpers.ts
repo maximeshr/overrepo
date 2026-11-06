@@ -17,6 +17,9 @@ writeFileSync(
 );
 process.env.GIT_CONFIG_GLOBAL = isolatedGitConfig;
 process.env.GIT_CONFIG_NOSYSTEM = "1";
+// Git hooks export these (e.g. GIT_DIR in a worktree's pre-push); they would redirect every test repository.
+for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"])
+  delete process.env[name];
 
 const tempDirs: string[] = [];
 afterAll(() => {
