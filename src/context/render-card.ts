@@ -51,6 +51,14 @@ function list(items: string[], limit: number, noun: string): string[] {
   return lines;
 }
 
+/** `pnpm 10.4.1` when a version is declared, `pnpm (version not declared)` when only a lockfile names it. */
+function packageManagerLabel(analysis: Analysis, name: string): string {
+  const specs = analysis.packageManagerVersions.filter((spec) => spec.name === name);
+  if (specs.length === 0) return name;
+  const version = specs.find((spec) => spec.version)?.version;
+  return version ? `${name} ${version}` : `${name} (version not declared)`;
+}
+
 function render(input: CardInput, limits: Limits): string {
   const { analysis, card } = input;
   const { project, stack } = analysis;
@@ -78,6 +86,10 @@ function render(input: CardInput, limits: Limits): string {
   const facts = [`- **Path:** [${code(`${project.path}/`)}](${repoLink()})`];
   if (project.url) facts.push(`- **Repository:** ${code(project.url)}`);
   if (project.tags.length > 0) facts.push(`- **Tags:** ${project.tags.join(", ")}`);
+  if (analysis.lastCommit)
+    facts.push(
+      `- **Last commit:** ${analysis.lastCommit.date.slice(0, 10)} (${code(analysis.lastCommit.shortSha)} on ${code("origin/HEAD")})`,
+    );
   out.push(...facts, "");
 
   if (!analysis.cloned) {
@@ -102,7 +114,10 @@ function render(input: CardInput, limits: Limits): string {
     [
       ["Languages", stack.languages],
       ["Frameworks", stack.frameworks],
-      ["Package managers", stack.packageManagers],
+      [
+        "Package managers",
+        stack.packageManagers.map((name) => packageManagerLabel(analysis, name)),
+      ],
       ["Runtimes", stack.runtimes],
       ["Tooling", stack.tools],
       ["Notes", stack.notes],

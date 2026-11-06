@@ -1,8 +1,8 @@
-import { isGitRepo } from "../git/git.ts";
+import { commitInfo, isGitRepo, type CommitInfo } from "../git/git.ts";
 import type { Project } from "../core/model.ts";
 import { defaultDetectors } from "./detectors/index.ts";
 import { openRepoFiles } from "./repo-files.ts";
-import type { Detection, Detector, PackageId, Script } from "./types.ts";
+import type { Detection, Detector, PackageId, Script, VersionSpec } from "./types.ts";
 
 const AGENT_FILES = [
   "AGENTS.md",
@@ -26,6 +26,12 @@ export interface Analysis {
   project: Project;
   cloned: boolean;
   stack: Stack;
+  /** Runtime versions with the file declaring each, e.g. Node.js from `engines`, `.nvmrc`, `.node-version`. */
+  runtimeVersions: VersionSpec[];
+  /** Package managers with their declared version (`undefined` when only a lockfile names them). */
+  packageManagerVersions: VersionSpec[];
+  /** Commit the analysis was read from (`origin/HEAD`), `undefined` when not cloned or missing. */
+  lastCommit: CommitInfo | undefined;
   scripts: Script[];
   packages: PackageId[];
   dependencies: PackageId[];
@@ -53,6 +59,9 @@ function emptyAnalysis(project: Project, cloned: boolean): Analysis {
       tools: [],
       notes: [],
     },
+    runtimeVersions: [],
+    packageManagerVersions: [],
+    lastCommit: undefined,
     scripts: [],
     packages: [],
     dependencies: [],
@@ -86,6 +95,9 @@ function merge(analysis: Analysis, detection: Detection): void {
   pushUnique(stack.runtimes, detection.runtimes);
   pushUnique(stack.tools, detection.tools);
   pushUnique(stack.notes, detection.notes);
+  const versionKey = (spec: VersionSpec) => `${spec.name}\0${spec.source}\0${spec.version ?? ""}`;
+  pushUnique(analysis.runtimeVersions, detection.runtimeVersions, versionKey);
+  pushUnique(analysis.packageManagerVersions, detection.packageManagerVersions, versionKey);
   pushUnique(analysis.scripts, detection.scripts, (script) => `${script.runner} ${script.name}`);
   pushUnique(analysis.packages, detection.packages, (id) => `${id.ecosystem}:${id.name}`);
   pushUnique(analysis.dependencies, detection.dependencies, (id) => `${id.ecosystem}:${id.name}`);
@@ -103,6 +115,7 @@ export async function analyzeProject(
   const analysis = emptyAnalysis(project, true);
   const files = await openRepoFiles(project.dir, ref);
   analysis.tree = files.topLevel;
+  analysis.lastCommit = await commitInfo(project.dir, ref);
 
   const detections: Detection[] = [];
   for (const detector of detectors) {
