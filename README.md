@@ -93,7 +93,9 @@ summary:
   outDir: docs/repos
 ```
 
-Summaries are read from each clone's `origin/HEAD`, so a dirty checkout does not change them. In CI, `overrepo context --check` fails when a summary is out of date.
+Summaries are read from each clone's `origin/HEAD`, so a dirty checkout does not change them. Each summary records the date and short hash of that commit, the stack, and the declared versions: Node.js from `engines`, `devEngines.runtime`, `.nvmrc` and `.node-version`, and the package manager from `packageManager` or `devEngines.packageManager` (a manager known only from its lockfile is shown as "version not declared").
+
+The same data is available programmatically: `analyzeProject()` returns `runtimeVersions` and `packageManagerVersions` (each entry gives the name, the raw version and the file it comes from) and `lastCommit` (`sha`, `shortSha`, UTC `date`). In CI, `overrepo context --check` fails when a summary is out of date.
 
 ### Importing a catalogue
 

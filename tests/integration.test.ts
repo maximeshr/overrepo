@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vite-plus/test";
+import { analyzeProject } from "../src/context/analyze.ts";
 import { cli, createRemote, git, tempDir } from "./helpers.ts";
 
 /** Fleet whose manifest sits in the same directory as the clones. */
@@ -264,7 +265,14 @@ describe("context", () => {
     mkdirSync(workspace, { recursive: true });
     const url = createRemote(tempDir("overrepo-summary-remotes-"), "collect", {
       "README.md": "# collect\n\ncommitted body\n",
-      "package.json": JSON.stringify({ name: "collect", scripts: { test: "echo ok" } }),
+      "package.json": JSON.stringify({
+        name: "collect",
+        scripts: { test: "echo ok" },
+        engines: { node: ">=20" },
+        packageManager: "pnpm@10.4.1+sha512.abcdef",
+      }),
+      ".nvmrc": "20.11.0\n",
+      "pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
     });
     writeFileSync(
       path.join(workspace, "overrepo.yaml"),
@@ -284,6 +292,11 @@ describe("context", () => {
     expect((await cli(hub, [...args, "sync", "--tags", "collect"])).code).toBe(0);
     const clone = path.join(hub, "acme/collect/collect");
     writeFileSync(path.join(clone, "README.md"), "# collect\n\nDIRTY body\n");
+    writeFileSync(path.join(clone, ".nvmrc"), "16\n");
+    const sha = git(clone, "rev-parse", "origin/HEAD");
+    const committed = new Date(
+      git(clone, "log", "-1", "--format=%cI", "origin/HEAD"),
+    ).toISOString();
 
     expect((await cli(hub, [...args, "context"])).code).toBe(0);
     const card = path.join(workspace, "aidd_docs/memory/internal/acme/collect/collect.md");
@@ -293,6 +306,24 @@ describe("context", () => {
     expect(text).toContain("committed body");
     expect(text).not.toContain("DIRTY");
     expect(text).toContain("Collect");
+    expect(text).toContain(
+      `- **Last commit:** ${committed.slice(0, 10)} (\`${sha.slice(0, 7)}\` on \`origin/HEAD\`)`,
+    );
+    expect(text).toContain("- **Package managers:** pnpm 10.4.1");
+    expect(text).toContain("- **Runtimes:** Node >=20, Node 20.11.0 (.nvmrc)");
+
+    const analysis = await analyzeProject(
+      { name: "collect", path: "collect", dir: clone, url, desc: undefined, tags: [] },
+      [],
+    );
+    expect(analysis.lastCommit).toEqual({ sha, shortSha: sha.slice(0, 7), date: committed });
+    expect(analysis.runtimeVersions).toEqual([
+      { name: "node", version: ">=20", source: "package.json#engines.node" },
+      { name: "node", version: "20.11.0", source: ".nvmrc" },
+    ]);
+    expect(analysis.packageManagerVersions).toEqual([
+      { name: "pnpm", version: "10.4.1", source: "package.json#packageManager" },
+    ]);
 
     const again = await cli(hub, [...args, "context", "--json"]);
     expect(again.code).toBe(0);
