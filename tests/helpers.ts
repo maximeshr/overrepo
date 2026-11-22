@@ -34,35 +34,34 @@ afterAll(() => {
   }
 });
 
-export function tempDir(prefix = "overrepo-"): string {
+export const tempDir = (prefix = "overrepo-"): string => {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
   tempDirs.push(dir);
 
   return dir;
-}
+};
 
-export function git(cwd: string, ...args: string[]): string {
-  return execFileSync("git", args, {
+export const git = (cwd: string, ...args: string[]): string =>
+  execFileSync("git", args, {
     cwd,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
-}
 
-function writeFiles(dir: string, files: Record<string, string>): void {
+const writeFiles = (dir: string, files: Record<string, string>): void => {
   for (const [file, content] of Object.entries(files)) {
     const target = path.join(dir, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, content);
   }
-}
+};
 
 /** Creates a repository with one commit and returns its `file://` URL */
-export function createRemote(
+export const createRemote = (
   base: string,
   name: string,
   files: Record<string, string> = { "README.md": `# ${name}\n` },
-): string {
+): string => {
   const dir = path.join(base, `${name}.git-src`);
   mkdirSync(dir, { recursive: true });
   git(dir, "init", "-q");
@@ -71,7 +70,7 @@ export function createRemote(
   git(dir, "commit", "-q", "-m", "initial");
 
   return `file://${dir}`;
-}
+};
 
 export interface TestRun {
   code: number;
@@ -79,7 +78,7 @@ export interface TestRun {
   stderr: string;
 }
 
-export async function cli(cwd: string, args: string[], stdin = ""): Promise<TestRun> {
+export const cli = async (cwd: string, args: string[], stdin = ""): Promise<TestRun> => {
   const out: string[] = [];
   const err: string[] = [];
 
@@ -102,4 +101,4 @@ export async function cli(cwd: string, args: string[], stdin = ""): Promise<Test
   const code = await runCli(args, io);
 
   return { code, stdout: out.join(""), stderr: err.join("") };
-}
+};

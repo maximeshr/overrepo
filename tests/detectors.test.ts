@@ -7,7 +7,7 @@ import {
 import type { RepoFiles } from "../src/context/types.ts";
 
 /** In-memory repository: keys are root-relative paths, values their contents */
-function memoryFiles(entries: Record<string, string>): RepoFiles {
+const memoryFiles = (entries: Record<string, string>): RepoFiles => {
   const readText = async (file: string) => entries[file];
 
   return {
@@ -23,7 +23,7 @@ function memoryFiles(entries: Record<string, string>): RepoFiles {
       return text === undefined ? undefined : (JSON.parse(text) as T);
     },
   };
-}
+};
 
 const pkg = (fields: Record<string, unknown>) => JSON.stringify({ name: "app", ...fields });
 

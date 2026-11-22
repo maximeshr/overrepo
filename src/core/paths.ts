@@ -4,7 +4,7 @@ import path from "node:path";
  * Normalizes a path relative to the fleet root (`acme/collect/collect`).
  * Returns an error message when the path is absolute, empty, or leaves the root.
  */
-export function normalizeRelativePath(input: string): { path: string } | { error: string } {
+export const normalizeRelativePath = (input: string): { path: string } | { error: string } => {
   const slashed = input.trim().replaceAll("\\", "/");
 
   if (slashed === "") {
@@ -26,24 +26,22 @@ export function normalizeRelativePath(input: string): { path: string } | { error
   }
 
   return { path: normalized };
-}
+};
 
 /** True when `absolute` is `parent` or a directory inside it */
-export function isInsideDir(parent: string, absolute: string): boolean {
+export const isInsideDir = (parent: string, absolute: string): boolean => {
   const relative = path.relative(path.resolve(parent), path.resolve(absolute));
 
   return (
     relative === "" ||
     (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))
   );
-}
+};
 
 /** `a/b/c` is inside `a/b` (or equal to it) */
-export function isWithin(child: string, parent: string): boolean {
-  return child === parent || child.startsWith(`${parent}/`);
-}
+export const isWithin = (child: string, parent: string): boolean =>
+  child === parent || child.startsWith(`${parent}/`);
 
 /** Converts an absolute path below `root` into a POSIX relative path */
-export function toPosixRelative(root: string, absolute: string): string {
-  return path.relative(root, absolute).split(path.sep).join("/");
-}
+export const toPosixRelative = (root: string, absolute: string): string =>
+  path.relative(root, absolute).split(path.sep).join("/");

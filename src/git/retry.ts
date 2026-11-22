@@ -17,7 +17,7 @@ const TRANSIENT_PATTERNS = [
 ];
 
 /** Network hiccups worth retrying; auth failures and missing repositories are not */
-function isTransientGitError(error: unknown): boolean {
+const isTransientGitError = (error: unknown): boolean => {
   if (!(error instanceof GitError) || error.aborted) {
     return false;
   }
@@ -27,7 +27,7 @@ function isTransientGitError(error: unknown): boolean {
   }
 
   return TRANSIENT_PATTERNS.some((pattern) => pattern.test(error.stderr));
-}
+};
 
 export interface RetryOptions {
   retries: number;
@@ -38,7 +38,10 @@ export interface RetryOptions {
   onRetry?: (error: unknown, attempt: number) => void | Promise<void>;
 }
 
-export async function withRetry<T>(operation: () => Promise<T>, options: RetryOptions): Promise<T> {
+export const withRetry = async <T>(
+  operation: () => Promise<T>,
+  options: RetryOptions,
+): Promise<T> => {
   const baseDelay = options.baseDelay ?? 1000;
 
   for (let attempt = 0; ; attempt += 1) {
@@ -60,4 +63,4 @@ export async function withRetry<T>(operation: () => Promise<T>, options: RetryOp
       }
     }
   }
-}
+};

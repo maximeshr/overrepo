@@ -17,24 +17,22 @@ export interface Io {
   signal: AbortSignal;
 }
 
-export function processIo(signal: AbortSignal): Io {
-  return {
-    cwd: process.cwd(),
-    write: (text) => process.stdout.write(text),
-    error: (text) => process.stderr.write(text),
-    readStdin: async () => {
-      const chunks: Buffer[] = [];
+export const processIo = (signal: AbortSignal): Io => ({
+  cwd: process.cwd(),
+  write: (text) => process.stdout.write(text),
+  error: (text) => process.stderr.write(text),
+  readStdin: async () => {
+    const chunks: Buffer[] = [];
 
-      for await (const chunk of process.stdin) {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
-      }
+    for await (const chunk of process.stdin) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+    }
 
-      return Buffer.concat(chunks).toString("utf-8");
-    },
-    stdinIsTTY:  process.stdin.isTTY,
-    stdoutIsTTY:  process.stdout.isTTY,
-    stderrIsTTY:  process.stderr.isTTY,
-    colors: picocolors.createColors(picocolors.isColorSupported),
-    signal,
-  };
-}
+    return Buffer.concat(chunks).toString("utf-8");
+  },
+  stdinIsTTY: process.stdin.isTTY,
+  stdoutIsTTY: process.stdout.isTTY,
+  stderrIsTTY: process.stderr.isTTY,
+  colors: picocolors.createColors(picocolors.isColorSupported),
+  signal,
+});

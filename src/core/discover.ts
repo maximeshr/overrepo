@@ -20,7 +20,7 @@ export interface ScanResult {
   partials: string[];
 }
 
-async function directoryChild(parent: string, entry: Dirent): Promise<string | undefined> {
+const directoryChild = async (parent: string, entry: Dirent): Promise<string | undefined> => {
   const child = path.join(parent, entry.name);
 
   if (entry.isSymbolicLink()) {
@@ -36,10 +36,10 @@ async function directoryChild(parent: string, entry: Dirent): Promise<string | u
   }
 
   return entry.isDirectory() ? child : undefined;
-}
+};
 
 /** Walks the tree below `root` looking for git repositories. The root repository itself is ignored. */
-export async function scanRepos(root: string, options: ScanOptions = {}): Promise<ScanResult> {
+export const scanRepos = async (root: string, options: ScanOptions = {}): Promise<ScanResult> => {
   const maxDepth = options.maxDepth ?? 4;
   const ignore = new Set(options.ignore);
   const result: ScanResult = { repos: [], partials: [] };
@@ -112,4 +112,4 @@ export async function scanRepos(root: string, options: ScanOptions = {}): Promis
   result.partials.sort();
 
   return result;
-}
+};

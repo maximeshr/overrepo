@@ -72,12 +72,10 @@ const LOCKFILES = [
 /** Top-level files that pin the Node.js version for version managers (nvm, fnm, nodenv, volta…) */
 const NODE_VERSION_FILES = [".nvmrc", ".node-version"] as const;
 
-function runnerFor(manager: string): string {
-  return manager === "yarn" ? "yarn" : `${manager} run`;
-}
+const runnerFor = (manager: string): string => (manager === "yarn" ? "yarn" : `${manager} run`);
 
 /** First non-empty line of a version file, comments removed */
-export function versionFileValue(text: string): string | undefined {
+export const versionFileValue = (text: string): string | undefined => {
   for (const line of text.split(/\r?\n/)) {
     const value = line.replace(/#.*/, "").trim();
 
@@ -87,12 +85,12 @@ export function versionFileValue(text: string): string | undefined {
   }
 
   return undefined;
-}
+};
 
 /** Parses the Corepack `packageManager` field: `pnpm@10.4.1+sha512.…` → pnpm, 10.4.1 */
-export function parsePackageManagerField(
+export const parsePackageManagerField = (
   value: string,
-): { name: string; version: string | undefined } | undefined {
+): { name: string; version: string | undefined } | undefined => {
   const match = /^([a-z]+)(?:@([^+\s]+)|$)/.exec(value.trim());
 
   if (!match?.[1]) {
@@ -100,13 +98,13 @@ export function parsePackageManagerField(
   }
 
   return { name: match[1], version: match[2] };
-}
+};
 
 /** Entries of a `devEngines` field (`runtime`, `packageManager`): one object or an array of them */
-function devEngineEntries(
+const devEngineEntries = (
   devEngines: unknown,
   key: "runtime" | "packageManager",
-): { name: string; version: string | undefined }[] {
+): { name: string; version: string | undefined }[] => {
   if (!isRecord(devEngines)) {
     return [];
   }
@@ -124,13 +122,13 @@ function devEngineEntries(
         ]
       : [],
   );
-}
+};
 
 /** Node.js versions declared by the repository, in order: engines, devEngines, version files */
-async function nodeVersions(
+const nodeVersions = async (
   pkg: PackageJson | undefined,
   files: RepoFiles,
-): Promise<VersionSpec[]> {
+): Promise<VersionSpec[]> => {
   const specs: VersionSpec[] = [];
   const engine = stringRecord(pkg?.engines).node;
 
@@ -162,10 +160,10 @@ async function nodeVersions(
   }
 
   return specs;
-}
+};
 
 /** Human label of a runtime spec, e.g. `Node >=20` (engines) or `Node 20.11.0 (.nvmrc)`. */
-function runtimeLabel(spec: VersionSpec): string {
+const runtimeLabel = (spec: VersionSpec): string => {
   const source =
     spec.source === "package.json#engines.node"
       ? ""
@@ -174,13 +172,13 @@ function runtimeLabel(spec: VersionSpec): string {
         : ` (${spec.source})`;
 
   return `Node ${spec.version ?? "?"}${source}`;
-}
+};
 
 /**
  * Package managers declared by `packageManager` and `devEngines.packageManager`. Without a
  * declaration, the lockfile names the manager but not its version, and npm is the default.
  */
-function packageManagerVersions(pkg: PackageJson, files: RepoFiles): VersionSpec[] {
+const packageManagerVersions = (pkg: PackageJson, files: RepoFiles): VersionSpec[] => {
   const specs: VersionSpec[] = [];
 
   const field =
@@ -207,7 +205,7 @@ function packageManagerVersions(pkg: PackageJson, files: RepoFiles): VersionSpec
       ? { name: lock[1], version: undefined, source: lock[0] }
       : { name: "npm", version: undefined, source: "default" },
   ];
-}
+};
 
 export const nodeDetector: Detector = {
   id: "node",

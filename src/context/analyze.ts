@@ -49,38 +49,36 @@ export interface Analysis {
   keyFiles: string[];
 }
 
-function emptyAnalysis(project: Project, cloned: boolean): Analysis {
-  return {
-    project,
-    cloned,
-    stack: {
-      languages: [],
-      frameworks: [],
-      packageManagers: [],
-      runtimes: [],
-      tools: [],
-      notes: [],
-    },
-    runtimeVersions: [],
-    packageManagerVersions: [],
-    lastCommit: undefined,
-    scripts: [],
-    packages: [],
-    dependencies: [],
-    references: [],
-    tree: [],
-    readmeFile: undefined,
-    readme: undefined,
-    agentFiles: [],
-    keyFiles: [],
-  };
-}
+const emptyAnalysis = (project: Project, cloned: boolean): Analysis => ({
+  project,
+  cloned,
+  stack: {
+    languages: [],
+    frameworks: [],
+    packageManagers: [],
+    runtimes: [],
+    tools: [],
+    notes: [],
+  },
+  runtimeVersions: [],
+  packageManagerVersions: [],
+  lastCommit: undefined,
+  scripts: [],
+  packages: [],
+  dependencies: [],
+  references: [],
+  tree: [],
+  readmeFile: undefined,
+  readme: undefined,
+  agentFiles: [],
+  keyFiles: [],
+});
 
-function pushUnique<T>(
+const pushUnique = <T>(
   target: T[],
   values: T[] | undefined,
   key: (value: T) => string = String,
-): void {
+): void => {
   const seen = new Set(target.map(key));
 
   for (const value of values ?? []) {
@@ -91,9 +89,9 @@ function pushUnique<T>(
     seen.add(key(value));
     target.push(value);
   }
-}
+};
 
-function merge(analysis: Analysis, detection: Detection): void {
+const merge = (analysis: Analysis, detection: Detection): void => {
   const { stack } = analysis;
   pushUnique(stack.languages, detection.languages);
   pushUnique(stack.frameworks, detection.frameworks);
@@ -108,15 +106,15 @@ function merge(analysis: Analysis, detection: Detection): void {
   pushUnique(analysis.packages, detection.packages, (id) => `${id.ecosystem}:${id.name}`);
   pushUnique(analysis.dependencies, detection.dependencies, (id) => `${id.ecosystem}:${id.name}`);
   pushUnique(analysis.references, detection.references);
-}
+};
 
 /** Inspects a project on disk. Projects that are not cloned get an empty analysis. */
-export async function analyzeProject(
+export const analyzeProject = async (
   project: Project,
   include: string[],
   detectors: Detector[] = defaultDetectors,
   ref = "origin/HEAD",
-): Promise<Analysis> {
+): Promise<Analysis> => {
   if (!isGitRepo(project.dir)) {
     return emptyAnalysis(project, false);
   }
@@ -184,4 +182,4 @@ export async function analyzeProject(
   }
 
   return analysis;
-}
+};

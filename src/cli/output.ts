@@ -6,16 +6,13 @@ import type { Colors, Io } from "./io.ts";
 // oxlint-disable-next-line no-control-regex
 const ANSI = /\u001B\[[0-9;]*m/g;
 
-function visibleLength(text: string): number {
-  return text.replaceAll(ANSI, "").length;
-}
+const visibleLength = (text: string): number => text.replaceAll(ANSI, "").length;
 
-function padEnd(text: string, width: number): string {
-  return text + " ".repeat(Math.max(0, width - visibleLength(text)));
-}
+const padEnd = (text: string, width: number): string =>
+  text + " ".repeat(Math.max(0, width - visibleLength(text)));
 
 /** Left-aligned columns; the last column is not padded */
-export function table(rows: string[][], header?: string[]): string {
+export const table = (rows: string[][], header?: string[]): string => {
   const all = header ? [header, ...rows] : rows;
   const widths: number[] = [];
 
@@ -34,13 +31,13 @@ export function table(rows: string[][], header?: string[]): string {
     )
     .map((line) => `${line}\n`)
     .join("");
-}
+};
 
-export function json(io: Io, value: unknown): void {
+export const json = (io: Io, value: unknown): void => {
   io.write(`${JSON.stringify(value, null, 2)}\n`);
-}
+};
 
-function statusIcon(colors: Colors, status: ResultStatus): string {
+const statusIcon = (colors: Colors, status: ResultStatus): string => {
   if (status === "ok") {
     return colors.green("✔");
   }
@@ -50,10 +47,10 @@ function statusIcon(colors: Colors, status: ResultStatus): string {
   }
 
   return colors.dim("○");
-}
+};
 
 /** Stable color per project name, so parallel output is easy to follow */
-export function projectColor(colors: Colors, name: string): (text: string) => string {
+export const projectColor = (colors: Colors, name: string): ((text: string) => string) => {
   const palette = [
     colors.cyan,
     colors.magenta,
@@ -70,30 +67,34 @@ export function projectColor(colors: Colors, name: string): (text: string) => st
   }
 
   return palette[hash % palette.length] ?? colors.cyan;
-}
+};
 
-export function prefixer(colors: Colors, projects: Project[]): (project: Project) => string {
+export const prefixer = (colors: Colors, projects: Project[]): ((project: Project) => string) => {
   const width = Math.min(28, Math.max(0, ...projects.map((project) => project.name.length)));
 
   return (project) => projectColor(colors, project.name)(`${project.name.padEnd(width)} │`);
-}
+};
 
 /** One line per finished project: `✔ name  message` */
-export function resultLine(colors: Colors, result: ProjectResult<unknown>, width: number): string {
+export const resultLine = (
+  colors: Colors,
+  result: ProjectResult<unknown>,
+  width: number,
+): string => {
   const detail =
     result.status === "failed"
       ? colors.red(result.error ?? "failed")
       : colors.dim(result.message ?? "");
 
   return `${statusIcon(colors, result.status)} ${result.project.name.padEnd(width)}  ${detail}`.trimEnd();
-}
+};
 
 /** Final recap, with every failure repeated so it is not lost in long output. Returns the exit code. */
-export function printSummary(
+export const printSummary = (
   io: Io,
   results: ProjectResult<unknown>[],
   options: { label?: string } = {},
-): 0 | 1 {
+): 0 | 1 => {
   const { colors } = io;
   const counts = summarize(results);
   const failures = results.filter((result) => result.status === "failed");
@@ -115,11 +116,11 @@ export function printSummary(
   io.error(`\n${options.label ? `${options.label}: ` : ""}${parts.join(", ")}\n`);
 
   return counts.failed > 0 ? 1 : 0;
-}
+};
 
-export function warn(io: Io, message: string): void {
+export const warn = (io: Io, message: string): void => {
   io.error(`${io.colors.yellow("warning")} ${message}\n`);
-}
+};
 
 export interface ProgressBar {
   update(done: number, total: number, label?: string): void;
@@ -128,7 +129,7 @@ export interface ProgressBar {
 }
 
 /** Single-line bar redrawn in place on stderr; a no-op when stderr is not a terminal */
-export function progressBar(io: Io, title: string, width = 24): ProgressBar {
+export const progressBar = (io: Io, title: string, width = 24): ProgressBar => {
   if (!io.stderrIsTTY) {
     return {
       update: () => {
@@ -160,4 +161,4 @@ export function progressBar(io: Io, title: string, width = 24): ProgressBar {
       drawn = false;
     },
   };
-}
+};

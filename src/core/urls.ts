@@ -2,7 +2,7 @@
  * Reduces a git remote to `host/owner/repo` (lowercase, no `.git`), so that
  * `git@github.com:Org/Repo.git`, `https://github.com/org/repo` and `github:org/repo` compare equal
  */
-export function normalizeGitUrl(input: string): string | undefined {
+export const normalizeGitUrl = (input: string): string | undefined => {
   let url = input.trim();
 
   if (!url) {
@@ -38,13 +38,12 @@ export function normalizeGitUrl(input: string): string | undefined {
   } catch {
     return undefined;
   }
-}
+};
 
-function clean(value: string): string {
-  return value
+const clean = (value: string): string =>
+  value
     .replace(/#.*$/, "")
     .replace(/\/+$/, "")
     .replace(/\.git$/i, "")
     .replaceAll(/\/+/g, "/")
     .toLowerCase();
-}

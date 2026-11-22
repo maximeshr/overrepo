@@ -54,11 +54,11 @@ export interface RunOptions<T> {
  * A failing project never stops the others; results keep the input order.
  * Once `signal` aborts, pending projects are reported as skipped ("interrupted").
  */
-export async function forEachProject<T>(
+export const forEachProject = async <T>(
   projects: Project[],
   task: (project: Project) => Promise<Outcome<T>>,
   options: RunOptions<T>,
-): Promise<ProjectResult<T>[]> {
+): Promise<ProjectResult<T>[]> => {
   const limit = pLimit(Math.max(1, options.concurrency));
 
   return await Promise.all(
@@ -94,7 +94,7 @@ export async function forEachProject<T>(
         }),
     ),
   );
-}
+};
 
 export interface Summary {
   ok: number;
@@ -102,7 +102,7 @@ export interface Summary {
   skipped: number;
 }
 
-export function summarize(results: ProjectResult<unknown>[]): Summary {
+export const summarize = (results: ProjectResult<unknown>[]): Summary => {
   const summary: Summary = { ok: 0, failed: 0, skipped: 0 };
 
   for (const result of results) {
@@ -110,4 +110,4 @@ export function summarize(results: ProjectResult<unknown>[]): Summary {
   }
 
   return summary;
-}
+};

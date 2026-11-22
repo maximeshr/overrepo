@@ -28,11 +28,9 @@ export interface InitResult {
 
 const HEADER = " overrepo manifest — https://github.com/maximeshr/overrepo#manifest";
 
-function sanitizeTag(name: string): string {
-  return name.replaceAll(/[\s,]+/g, "-");
-}
+const sanitizeTag = (name: string): string => name.replaceAll(/[\s,]+/g, "-");
 
-async function readDescription(dir: string): Promise<string | undefined> {
+const readDescription = async (dir: string): Promise<string | undefined> => {
   for (const file of ["package.json", "composer.json"]) {
     try {
       const json = JSON.parse(await readFile(path.join(dir, file), "utf-8")) as {
@@ -48,10 +46,10 @@ async function readDescription(dir: string): Promise<string | undefined> {
   }
 
   return undefined;
-}
+};
 
 /** Builds the manifest document with flow-style tag lists and a header comment */
-function createManifestDocument(manifest: Record<string, unknown>): Document {
+const createManifestDocument = (manifest: Record<string, unknown>): Document => {
   const doc = new Document(manifest);
   doc.commentBefore = HEADER;
   const projects = doc.get("projects");
@@ -73,13 +71,13 @@ function createManifestDocument(manifest: Record<string, unknown>): Document {
   }
 
   return doc;
-}
+};
 
-async function scanManifest(
+const scanManifest = async (
   root: string,
   depth: number | undefined,
   warnings: string[],
-): Promise<Record<string, unknown>> {
+): Promise<Record<string, unknown>> => {
   const { repos } = await scanRepos(root, { maxDepth: depth });
   const projects: Record<string, Record<string, unknown>> = {};
 
@@ -113,10 +111,10 @@ async function scanManifest(
   }
 
   return { projects };
-}
+};
 
 /** Creates `overrepo.yaml` from the git repositories found below `root` */
-export async function init(options: InitOptions): Promise<InitResult> {
+export const init = async (options: InitOptions): Promise<InitResult> => {
   const root = path.resolve(options.root);
   const file = path.join(root, MANIFEST_FILES[0]);
 
@@ -157,4 +155,4 @@ export async function init(options: InitOptions): Promise<InitResult> {
   ).length;
 
   return { file, text, projectCount, warnings, written: !options.dryRun };
-}
+};

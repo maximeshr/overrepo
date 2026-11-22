@@ -15,10 +15,10 @@ export interface StatusOptions {
 }
 
 /** Aggregated git state. Missing clones are reported as `skipped` with an `absent` state, not as failures. */
-export async function status(
+export const status = async (
   manifest: Manifest,
   options: StatusOptions = {},
-): Promise<ProjectResult<ProjectState>[]> {
+): Promise<ProjectResult<ProjectState>[]> => {
   const timeout = (options.timeout ?? manifest.defaults.timeout) * 1000;
 
   return await forEachProject<ProjectState>(
@@ -38,4 +38,4 @@ export async function status(
       onEvent: options.onEvent,
     },
   );
-}
+};

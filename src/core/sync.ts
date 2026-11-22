@@ -27,15 +27,12 @@ export interface SyncReport {
   results: ProjectResult<SyncAction>[];
 }
 
-function partialCloneDir(project: Project): string {
-  return path.join(path.dirname(project.dir), `.${path.basename(project.dir)}${PARTIAL_SUFFIX}`);
-}
+const partialCloneDir = (project: Project): string =>
+  path.join(path.dirname(project.dir), `.${path.basename(project.dir)}${PARTIAL_SUFFIX}`);
 
-async function isEmptyDir(dir: string): Promise<boolean> {
-  return (await readdir(dir)).length === 0;
-}
+const isEmptyDir = async (dir: string): Promise<boolean> => (await readdir(dir)).length === 0;
 
-export async function sync(manifest: Manifest, options: SyncOptions = {}): Promise<SyncReport> {
+export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promise<SyncReport> => {
   const projects = options.projects ?? manifest.projects;
   const timeout = (options.timeout ?? manifest.defaults.timeout) * 1000;
   const retries = options.retries ?? manifest.defaults.retries;
@@ -152,4 +149,4 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
   );
 
   return { results };
-}
+};

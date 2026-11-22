@@ -50,7 +50,7 @@ export interface ImportReport {
 
 const FIELDS = ["url", "desc", "tags"] as const;
 
-export function parseImportSource(json: string): ImportProject[] {
+export const parseImportSource = (json: string): ImportProject[] => {
   let data: unknown;
 
   try {
@@ -88,13 +88,11 @@ export function parseImportSource(json: string): ImportProject[] {
   }
 
   return projects;
-}
+};
 
-function sameValue(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
+const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
-function projectsMap(doc: Document): YAMLMap {
+const projectsMap = (doc: Document): YAMLMap => {
   const projects = doc.get("projects", true);
 
   if (isMap(projects)) {
@@ -110,9 +108,9 @@ function projectsMap(doc: Document): YAMLMap {
   doc.set("projects", created);
 
   return created;
-}
+};
 
-function setField(doc: Document, project: YAMLMap, key: string, value: unknown): void {
+const setField = (doc: Document, project: YAMLMap, key: string, value: unknown): void => {
   const node = doc.createNode(value);
 
   if (isSeq(node)) {
@@ -120,14 +118,14 @@ function setField(doc: Document, project: YAMLMap, key: string, value: unknown):
   }
 
   project.set(key, node);
-}
+};
 
 /** Merges external project definitions into the manifest, keeping comments and formatting */
-export async function importProjects(
+export const importProjects = async (
   manifest: Manifest,
   incoming: ImportProject[],
   options: ImportOptions = {},
-): Promise<ImportReport> {
+): Promise<ImportReport> => {
   const original = await readFile(manifest.file, "utf-8");
   const { doc } = parseManifestDocument(original, manifest.file);
   const projects = projectsMap(doc);
@@ -251,4 +249,4 @@ export async function importProjects(
   }
 
   return report;
-}
+};

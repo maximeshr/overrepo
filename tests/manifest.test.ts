@@ -5,7 +5,7 @@ import { parseManifest } from "../src/core/manifest.ts";
 
 const parse = (text: string, file = "/meta/overrepo.yaml") => parseManifest(text, file);
 
-function issuesOf(text: string, file?: string): ManifestError["issues"] {
+const issuesOf = (text: string, file?: string): ManifestError["issues"] => {
   try {
     parse(text, file);
   } catch (error) {
@@ -17,7 +17,7 @@ function issuesOf(text: string, file?: string): ManifestError["issues"] {
   }
 
   throw new Error("expected a ManifestError");
-}
+};
 
 describe(parseManifest, () => {
   it("resolves the project key as the path", () => {

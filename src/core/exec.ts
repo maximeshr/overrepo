@@ -37,10 +37,10 @@ export interface ExecOptions {
   env?: Record<string, string>;
 }
 
-async function forEachLine(
+const forEachLine = async (
   stream: Readable | null | undefined,
   onLine: (line: string) => void,
-): Promise<void> {
+): Promise<void> => {
   if (!stream) {
     return;
   }
@@ -70,13 +70,13 @@ async function forEachLine(
     stream.once("close", flush);
     stream.once("error", flush);
   });
-}
+};
 
 /** Runs a command in each selected project directory. Projects that are not cloned are skipped. */
-export async function execInProjects(
+export const execInProjects = async (
   manifest: Manifest,
   options: ExecOptions,
-): Promise<ProjectResult<ExecValue>[]> {
+): Promise<ProjectResult<ExecValue>[]> => {
   const [file, ...args] = typeof options.command === "string" ? [options.command] : options.command;
 
   if (!file) {
@@ -156,4 +156,4 @@ export async function execInProjects(
     },
     { concurrency: options.concurrency ?? 1, signal: options.signal, onEvent: options.onEvent },
   );
-}
+};

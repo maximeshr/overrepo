@@ -17,18 +17,17 @@ const UNTAGGED = "other";
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
-function folderOf(project: Project): string {
+const folderOf = (project: Project): string => {
   const slash = project.path.indexOf("/");
 
   return slash === -1 ? TOP_LEVEL : project.path.slice(0, slash);
-}
+};
 
 /** First tag that says more than the folder name */
-function primaryTag(project: Project, folder: string): string {
-  return project.tags.find((tag) => tag !== folder) ?? UNTAGGED;
-}
+const primaryTag = (project: Project, folder: string): string =>
+  project.tags.find((tag) => tag !== folder) ?? UNTAGGED;
 
-function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+const groupBy = <T>(items: T[], key: (item: T) => string): Map<string, T[]> => {
   const groups = new Map<string, T[]>();
 
   for (const item of items) {
@@ -37,9 +36,9 @@ function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
   }
 
   return groups;
-}
+};
 
-export function renderIndex(input: IndexInput): string {
+export const renderIndex = (input: IndexInput): string => {
   const folders = groupBy(input.projects, folderOf);
 
   const folderNames = [...folders.keys()].toSorted((a, b) =>
@@ -90,4 +89,4 @@ export function renderIndex(input: IndexInput): string {
   }
 
   return `${out.join("\n").trimEnd()}\n\n${manualBlock(input.manual)}\n`;
-}
+};

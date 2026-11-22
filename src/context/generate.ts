@@ -40,23 +40,22 @@ export interface ContextReport {
   stale: boolean;
 }
 
-export function cardPath(manifest: Manifest, project: Project): string {
-  return `${manifest.summary.outDir}/${project.path}.md`;
-}
+export const cardPath = (manifest: Manifest, project: Project): string =>
+  `${manifest.summary.outDir}/${project.path}.md`;
 
-async function readIfExists(file: string): Promise<string | undefined> {
+const readIfExists = async (file: string): Promise<string | undefined> => {
   try {
     return await readFile(file, "utf-8");
   } catch {
     return undefined;
   }
-}
+};
 
 /** Links projects through published package names and git URLs found in dependency specs */
-function internalDependencies(
+const internalDependencies = (
   analyses: Analysis[],
   cardOf: (project: Project) => string,
-): Map<string, { uses: DependencyLink[]; usedBy: DependencyLink[] }> {
+): Map<string, { uses: DependencyLink[]; usedBy: DependencyLink[] }> => {
   const byPackage = new Map<string, Project>();
   const byUrl = new Map<string, Project>();
 
@@ -125,9 +124,9 @@ function internalDependencies(
       { uses: [...uses.values()].toSorted(byName), usedBy: [...usedBy.values()].toSorted(byName) },
     ]),
   );
-}
+};
 
-async function listMarkdown(dir: string, root: string): Promise<string[]> {
+const listMarkdown = async (dir: string, root: string): Promise<string[]> => {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
 
   const files = await Promise.all(
@@ -145,13 +144,13 @@ async function listMarkdown(dir: string, root: string): Promise<string[]> {
   );
 
   return files.flat();
-}
+};
 
 /** Generates `index.md` and one card per project. Writes only files whose content changed. */
-export async function generateContext(
+export const generateContext = async (
   manifest: Manifest,
   options: ContextOptions = {},
-): Promise<ContextReport> {
+): Promise<ContextReport> => {
   const { summary } = manifest;
   const base = manifest.manifestDir;
   const cardOf = (project: Project) => cardPath(manifest, project);
@@ -275,4 +274,4 @@ export async function generateContext(
     files,
     stale: files.some((file) => file.status === "stale" || file.status === "orphan"),
   };
-}
+};

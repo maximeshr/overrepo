@@ -19,15 +19,14 @@ export interface Context {
   config: string | undefined;
 }
 
-export function contextOf(io: Io, command: Command): Context {
+export const contextOf = (io: Io, command: Command): Context => {
   const globals = command.optsWithGlobals<GlobalOptions>();
 
   return { io, cwd: path.resolve(io.cwd, globals.cwd ?? "."), config: globals.config };
-}
+};
 
-export async function load(context: Context): Promise<Manifest> {
-  return await loadManifest({ cwd: context.cwd, file: context.config });
-}
+export const load = async (context: Context): Promise<Manifest> =>
+  await loadManifest({ cwd: context.cwd, file: context.config });
 
 const list = (value: string, previous: string[] | undefined): string[] => [
   ...(previous ?? []),
@@ -37,7 +36,7 @@ const list = (value: string, previous: string[] | undefined): string[] => [
     .filter(Boolean),
 ];
 
-export function positiveInt(value: string): number {
+export const positiveInt = (value: string): number => {
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || parsed < 1) {
@@ -45,9 +44,9 @@ export function positiveInt(value: string): number {
   }
 
   return parsed;
-}
+};
 
-export function positiveNumber(value: string): number {
+export const positiveNumber = (value: string): number => {
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -55,9 +54,9 @@ export function positiveNumber(value: string): number {
   }
 
   return parsed;
-}
+};
 
-export function nonNegativeInt(value: string): number {
+export const nonNegativeInt = (value: string): number => {
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || parsed < 0) {
@@ -65,7 +64,7 @@ export function nonNegativeInt(value: string): number {
   }
 
   return parsed;
-}
+};
 
 export interface SelectionOptions {
   all?: boolean;
@@ -74,27 +73,22 @@ export interface SelectionOptions {
   projects?: string[];
 }
 
-export function withSelection(command: Command): Command {
-  return command
+export const withSelection = (command: Command): Command =>
+  command
     .option("-a, --all", "select every project")
     .option("-t, --tags <tags>", "projects having all these tags (comma-separated)", list)
     .option("--paths <prefixes>", "projects under these path prefixes", list)
     .option("-p, --projects <paths>", "projects by path (the manifest key)", list);
-}
 
-function selection(options: SelectionOptions): Selection {
-  return {
-    all: options.all,
-    tags: options.tags,
-    paths: options.paths,
-    projects: options.projects,
-  };
-}
+const selection = (options: SelectionOptions): Selection => ({
+  all: options.all,
+  tags: options.tags,
+  paths: options.paths,
+  projects: options.projects,
+});
 
-export function select(
+export const select = (
   manifest: Manifest,
   options: SelectionOptions,
   requireExplicit = false,
-): Project[] {
-  return selectProjects(manifest.projects, selection(options), { requireExplicit });
-}
+): Project[] => selectProjects(manifest.projects, selection(options), { requireExplicit });

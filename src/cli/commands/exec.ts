@@ -18,8 +18,8 @@ interface ExecFlags extends SelectionOptions {
   json?: boolean;
 }
 
-function withExecOptions(command: Command): Command {
-  return withSelection(command)
+const withExecOptions = (command: Command): Command => 
+  withSelection(command)
     .option("--parallel", "run in parallel")
     .option("-j, --concurrency <n>", "run in parallel with this concurrency", positiveInt)
     .option(
@@ -27,17 +27,17 @@ function withExecOptions(command: Command): Command {
       "prefix (live, prefixed lines) | grouped (one block per project) | raw (sequential, interactive)",
     )
     .option("--timeout <seconds>", "kill the command after this delay", positiveNumber)
-    .option("--json", "capture output and print results as JSON");
-}
+    .option("--json", "capture output and print results as JSON")
+;
 
 /** Runs one command in each selected project. Returns the exit code. */
-async function runInProjects(
+const runInProjects = async (
   io: Io,
   manifest: Manifest,
   projects: Project[],
   command: string | string[],
   flags: ExecFlags,
-): Promise<number> {
+): Promise<number> => {
   const concurrency = flags.concurrency ?? (flags.parallel ? manifest.defaults.concurrency : 1);
   const mode: OutputMode = flags.output ?? "prefix";
 
@@ -139,7 +139,7 @@ async function runInProjects(
   }
 
   return printSummary(io, results);
-}
+};
 
 export const registerExec: Register = (program, run, io) => {
   withExecOptions(

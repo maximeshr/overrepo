@@ -4,7 +4,7 @@ import type { RepoFiles } from "./types.ts";
 /** Files larger than this are never read by detectors */
 const MAX_FILE_BYTES = 1024 * 1024;
 
-function compareEntries(a: string, b: string): number {
+const compareEntries = (a: string, b: string): number => {
   const aDir = a.endsWith("/");
   const bDir = b.endsWith("/");
 
@@ -13,14 +13,14 @@ function compareEntries(a: string, b: string): number {
   }
 
   return a < b ? -1 : a > b ? 1 : 0;
-}
+};
 
 /**
  * Creates the file accessor of a cloned repository at `ref`.
  * Every read uses that revision. The working tree is never consulted.
  * A missing revision yields an empty listing.
  */
-export async function openRepoFiles(dir: string, ref: string): Promise<RepoFiles> {
+export const openRepoFiles = async (dir: string, ref: string): Promise<RepoFiles> => {
   const topLevel = (await trackedTopLevel(dir, ref)) ?? [];
   topLevel.sort(compareEntries);
 
@@ -55,4 +55,4 @@ export async function openRepoFiles(dir: string, ref: string): Promise<RepoFiles
       }
     },
   };
-}
+};

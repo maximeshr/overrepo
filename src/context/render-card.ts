@@ -32,7 +32,7 @@ interface Limits {
 
 const MAX_SCRIPT_COMMAND = 120;
 
-function frontmatter(data: Record<string, unknown>): string {
+const frontmatter = (data: Record<string, unknown>): string => {
   const doc = new Document(data);
 
   for (const key of Object.keys(data)) {
@@ -44,13 +44,12 @@ function frontmatter(data: Record<string, unknown>): string {
   }
 
   return `---\n${doc.toString({ lineWidth: 0 })}---`;
-}
+};
 
-function relativeLink(fromFile: string, toRootRelative: string): string {
-  return linkTarget(path.posix.relative(path.posix.dirname(fromFile), toRootRelative) || ".");
-}
+const relativeLink = (fromFile: string, toRootRelative: string): string =>
+  linkTarget(path.posix.relative(path.posix.dirname(fromFile), toRootRelative) || ".");
 
-function list(items: string[], limit: number, noun: string): string[] {
+const list = (items: string[], limit: number, noun: string): string[] => {
   const lines = items.slice(0, limit);
 
   if (items.length > limit) {
@@ -58,10 +57,10 @@ function list(items: string[], limit: number, noun: string): string[] {
   }
 
   return lines;
-}
+};
 
 /** `pnpm 10.4.1` when a version is declared, `pnpm (version not declared)` when only a lockfile names it */
-function packageManagerLabel(analysis: Analysis, name: string): string {
+const packageManagerLabel = (analysis: Analysis, name: string): string => {
   const specs = analysis.packageManagerVersions.filter((spec) => spec.name === name);
 
   if (specs.length === 0) {
@@ -71,9 +70,9 @@ function packageManagerLabel(analysis: Analysis, name: string): string {
   const version = specs.find((spec) => spec.version)?.version;
 
   return version ? `${name} ${version}` : `${name} (version not declared)`;
-}
+};
 
-function render(input: CardInput, limits: Limits): string {
+const render = (input: CardInput, limits: Limits): string => {
   const { analysis, card } = input;
   const { project, stack } = analysis;
 
@@ -225,13 +224,13 @@ function render(input: CardInput, limits: Limits): string {
   }
 
   return out.join("\n");
-}
+};
 
 /**
  * Renders a card whose generated part stays under `config.maxBytes`, shrinking the
  * least essential sections first (README, then tree, scripts, dependencies)
  */
-export function renderCard(input: CardInput): string {
+export const renderCard = (input: CardInput): string => {
   const { config } = input;
 
   const limits: Limits = {
@@ -269,4 +268,4 @@ export function renderCard(input: CardInput): string {
   }
 
   return `${body.trimEnd()}\n\n${manualBlock(input.manual)}\n`;
-}
+};

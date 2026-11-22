@@ -5,7 +5,7 @@ import { analyzeProject } from "../src/context/analyze.ts";
 import { cli, createRemote, git, tempDir } from "./helpers.ts";
 
 /** Fleet whose manifest sits in the same directory as the clones */
-function setupWorkspace(projectCount = 4) {
+const setupWorkspace = (projectCount = 4) => {
   const remotes = tempDir("overrepo-remotes-");
   const root = tempDir("overrepo-meta-");
   git(root, "init", "-q");
@@ -29,7 +29,7 @@ function setupWorkspace(projectCount = 4) {
   writeFileSync(path.join(root, "overrepo.yaml"), `projects:\n${projects.join("")}`);
 
   return { root, remotes };
-}
+};
 
 describe("sync", () => {
   it("clones everything in parallel and reports an unreachable repo without failing the others", async () => {

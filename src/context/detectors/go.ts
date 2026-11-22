@@ -13,7 +13,7 @@ const FRAMEWORKS = [
 ] as const;
 
 /** Parses the `module`, `go` and `require` directives of a go.mod file */
-function parseGoMod(text: string): { module?: string; go?: string; requires: string[] } {
+const parseGoMod = (text: string): { module?: string; go?: string; requires: string[] } => {
   const result: { module?: string; go?: string; requires: string[] } = { requires: [] };
   let inRequire = false;
 
@@ -50,7 +50,7 @@ function parseGoMod(text: string): { module?: string; go?: string; requires: str
   }
 
   return result;
-}
+};
 
 const stripMajor = (modulePath: string) => modulePath.replace(/\/v\d+$/, "");
 

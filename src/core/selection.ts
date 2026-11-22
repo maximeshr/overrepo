@@ -20,18 +20,15 @@ export interface SelectOptions {
 const nonEmpty = (values: string[] | undefined): values is string[] =>
   values !== undefined && values.length > 0;
 
-export function hasExplicitSelection(selection: Selection): boolean {
-  return (
-    Boolean(selection.all) || [selection.tags, selection.paths, selection.projects].some(nonEmpty)
-  );
-}
+export const hasExplicitSelection = (selection: Selection): boolean =>
+  Boolean(selection.all) || [selection.tags, selection.paths, selection.projects].some(nonEmpty);
 
 /** Filters projects, preserving manifest order. Criteria are combined with AND. */
-export function selectProjects(
+export const selectProjects = (
   projects: Project[],
   selection: Selection = {},
   options: SelectOptions = {},
-): Project[] {
+): Project[] => {
   if (options.requireExplicit && !hasExplicitSelection(selection)) {
     throw new UsageError("no projects selected: pass --all, --tags, --paths or --projects");
   }
@@ -78,4 +75,4 @@ export function selectProjects(
 
     return true;
   });
-}
+};

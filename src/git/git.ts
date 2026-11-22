@@ -36,7 +36,7 @@ export class GitError extends OverrepoError {
   }
 }
 
-function lastMeaningfulLine(stderr: string): string {
+const lastMeaningfulLine = (stderr: string): string => {
   const lines = stderr
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -45,12 +45,12 @@ function lastMeaningfulLine(stderr: string): string {
   const fatal = lines.find((line) => /^(fatal|error):/i.test(line));
 
   return (fatal ?? lines.at(-1) ?? "").replace(/^(fatal|error):\s*/i, "");
-}
+};
 
 let sshCommandProbe: Promise<boolean> | undefined;
 
 /** True when the user configured `core.sshCommand`, which `GIT_SSH_COMMAND` would override */
-async function hasCustomSshCommand(): Promise<boolean> {
+const hasCustomSshCommand = async (): Promise<boolean> => {
   sshCommandProbe ??= execa("git", ["config", "--get", "core.sshCommand"], {
     reject: false,
     stdin: "ignore",
@@ -60,13 +60,13 @@ async function hasCustomSshCommand(): Promise<boolean> {
   );
 
   return await sshCommandProbe;
-}
+};
 
 /**
  * Environment that guarantees git never waits for interactive input:
  * no credential prompt, and SSH in batch mode unless the user customized SSH
  */
-async function nonInteractiveEnv(): Promise<Record<string, string>> {
+const nonInteractiveEnv = async (): Promise<Record<string, string>> => {
   const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
 
   if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !(await hasCustomSshCommand())) {
@@ -74,10 +74,10 @@ async function nonInteractiveEnv(): Promise<Record<string, string>> {
   }
 
   return env;
-}
+};
 
 /** Runs git and returns trimmed stdout. Throws `GitError` on failure. */
-async function git(args: string[], options: GitRunOptions = {}): Promise<string> {
+const git = async (args: string[], options: GitRunOptions = {}): Promise<string> => {
   const result = await execa("git", args, {
     cwd: options.cwd,
     timeout: options.timeout,
@@ -106,44 +106,46 @@ async function git(args: string[], options: GitRunOptions = {}): Promise<string>
   }
 
   return result.stdout ?? "";
-}
+};
 
-export async function gitVersion(): Promise<string | undefined> {
+export const gitVersion = async (): Promise<string | undefined> => {
   try {
     return (await git(["--version"])).replace(/^git version\s*/, "");
   } catch {
     return undefined;
   }
-}
+};
 
 /** A directory is a repo when it has a `.git` directory or file (worktrees, submodules) */
-export function isGitRepo(dir: string): boolean {
-  return existsSync(path.join(dir, ".git"));
-}
+export const isGitRepo = (dir: string): boolean => existsSync(path.join(dir, ".git"));
 
-export function isDirectory(dir: string): boolean {
+export const isDirectory = (dir: string): boolean => {
   try {
     return statSync(dir).isDirectory();
   } catch {
     return false;
   }
-}
+};
 
 /** Clones the remote default branch. Blobs are fetched on demand. */
-export async function clone(url: string, dest: string, options: GitRunOptions = {}): Promise<void> {
+export const clone = async (
+  url: string,
+  dest: string,
+  options: GitRunOptions = {},
+): Promise<void> => {
   await git(["clone", "--no-progress", "--filter=blob:none", "--", url, dest], options);
-}
+};
 
-export async function originUrl(
+export const originUrl = async (
   dir: string,
   options: GitRunOptions = {},
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   try {
     return (await git(["remote", "get-url", "origin"], { ...options, cwd: dir })) || undefined;
   } catch {
     return undefined;
   }
-}
+};
 
 export interface RepoStatus {
   /** `undefined` when HEAD is detached */
@@ -158,7 +160,7 @@ export interface RepoStatus {
 }
 
 /** Parses `git status --porcelain=v2 --branch` */
-export function parseStatus(output: string): RepoStatus {
+export const parseStatus = (output: string): RepoStatus => {
   const status: RepoStatus = {
     branch: undefined,
     head: undefined,
@@ -194,30 +196,29 @@ export function parseStatus(output: string): RepoStatus {
   }
 
   return status;
-}
+};
 
-export async function repoStatus(dir: string, options: GitRunOptions = {}): Promise<RepoStatus> {
-  return parseStatus(await git(["status", "--porcelain=v2", "--branch"], { ...options, cwd: dir }));
-}
+export const repoStatus = async (dir: string, options: GitRunOptions = {}): Promise<RepoStatus> =>
+  parseStatus(await git(["status", "--porcelain=v2", "--branch"], { ...options, cwd: dir }));
 
-export async function fetch(dir: string, options: GitRunOptions = {}): Promise<void> {
+export const fetch = async (dir: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["fetch", "--prune", "--no-progress"], { ...options, cwd: dir });
-}
+};
 
-export async function pullFastForward(dir: string, options: GitRunOptions = {}): Promise<void> {
+export const pullFastForward = async (dir: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["pull", "--ff-only", "--no-progress"], { ...options, cwd: dir });
-}
+};
 
-export async function lsRemote(url: string, options: GitRunOptions = {}): Promise<void> {
+export const lsRemote = async (url: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["ls-remote", "--exit-code", "--heads", url], options);
-}
+};
 
 /** Top-level tracked entries of `ref` (`dirs` end with `/`), or `undefined` when the revision is missing */
-export async function trackedTopLevel(
+export const trackedTopLevel = async (
   dir: string,
   ref = "HEAD",
   options: GitRunOptions = {},
-): Promise<string[] | undefined> {
+): Promise<string[] | undefined> => {
   try {
     const output = await git(["ls-tree", "-z", ref], { ...options, cwd: dir });
 
@@ -232,15 +233,15 @@ export async function trackedTopLevel(
   } catch {
     return undefined;
   }
-}
+};
 
 /** True when `ref:file` exists (blob or tree) */
-export async function gitPathExists(
+export const gitPathExists = async (
   dir: string,
   ref: string,
   file: string,
   options: GitRunOptions = {},
-): Promise<boolean> {
+): Promise<boolean> => {
   try {
     await git(["cat-file", "-e", `${ref}:${file}`], { ...options, cwd: dir });
 
@@ -248,16 +249,16 @@ export async function gitPathExists(
   } catch {
     return false;
   }
-}
+};
 
 /** UTF-8 contents of `ref:file`, or `undefined` when it is missing or larger than `maxBytes` */
-export async function readGitFile(
+export const readGitFile = async (
   dir: string,
   ref: string,
   file: string,
   maxBytes: number,
   options: GitRunOptions = {},
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   try {
     const size = Number(await git(["cat-file", "-s", `${ref}:${file}`], { ...options, cwd: dir }));
 
@@ -269,7 +270,7 @@ export async function readGitFile(
   } catch {
     return undefined;
   }
-}
+};
 
 export interface CommitInfo {
   /** Full commit hash */
@@ -281,11 +282,11 @@ export interface CommitInfo {
 }
 
 /** The commit `ref` points to, or `undefined` when the revision is missing */
-export async function commitInfo(
+export const commitInfo = async (
   dir: string,
   ref: string,
   options: GitRunOptions = {},
-): Promise<CommitInfo | undefined> {
+): Promise<CommitInfo | undefined> => {
   try {
     const output = await git(["log", "-1", "--format=%H %cI", ref, "--"], {
       ...options,
@@ -303,4 +304,4 @@ export async function commitInfo(
   } catch {
     return undefined;
   }
-}
+};

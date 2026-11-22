@@ -12,7 +12,7 @@ import { registerSync } from "./commands/sync.ts";
 import type { Io } from "./io.ts";
 
 /** Exit codes: 0 success, 1 at least one project failed, 2 usage or configuration error, 130 interrupted */
-export async function runCli(argv: string[], io: Io): Promise<number> {
+export const runCli = async (argv: string[], io: Io): Promise<number> => {
   let exitCode = 0;
 
   const run =
@@ -103,4 +103,4 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
   }
 
   return exitCode;
-}
+};

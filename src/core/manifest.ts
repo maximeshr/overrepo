@@ -30,7 +30,7 @@ export interface ManifestLocation {
 }
 
 /** Finds `overrepo.yaml` in `cwd` or any parent directory */
-export function locateManifest(options: LocateOptions = {}): ManifestLocation | undefined {
+export const locateManifest = (options: LocateOptions = {}): ManifestLocation | undefined => {
   const cwd = path.resolve(options.cwd ?? process.cwd());
 
   if (options.file) {
@@ -58,9 +58,9 @@ export function locateManifest(options: LocateOptions = {}): ManifestLocation | 
 
     dir = parent;
   }
-}
+};
 
-export async function loadManifest(options: LocateOptions = {}): Promise<Manifest> {
+export const loadManifest = async (options: LocateOptions = {}): Promise<Manifest> => {
   const location = locateManifest(options);
 
   if (!location) {
@@ -76,7 +76,7 @@ export async function loadManifest(options: LocateOptions = {}): Promise<Manifes
   const text = await readFile(location.file, "utf-8");
 
   return parseManifest(text, location.file);
-}
+};
 
 export interface ParsedDocument {
   doc: Document;
@@ -84,7 +84,7 @@ export interface ParsedDocument {
 }
 
 /** Parses YAML keeping comments, for loss-less rewrites. Throws `ManifestError` on syntax errors. */
-export function parseManifestDocument(text: string, file: string): ParsedDocument {
+export const parseManifestDocument = (text: string, file: string): ParsedDocument => {
   const lineCounter = new LineCounter();
   const doc = parseDocument(text, { lineCounter, prettyErrors: false, uniqueKeys: true });
 
@@ -105,10 +105,10 @@ export function parseManifestDocument(text: string, file: string): ParsedDocumen
   }
 
   return { doc, lineCounter };
-}
+};
 
 /** Validates manifest text and resolves it into the runtime model */
-export function parseManifest(text: string, file: string): Manifest {
+export const parseManifest = (text: string, file: string): Manifest => {
   const { doc, lineCounter } = parseManifestDocument(text, file);
 
   const locate = (keyPath: PropertyKey[]): Pick<ManifestIssue, "line" | "column"> =>
@@ -126,18 +126,18 @@ export function parseManifest(text: string, file: string): Manifest {
   const manifestDir = path.dirname(path.resolve(file));
 
   return resolveManifest(result.data, manifestDir, path.resolve(file), locate);
-}
+};
 
-function displayName(file: string): string {
+const displayName = (file: string): string => {
   const relative = path.relative(process.cwd(), file);
 
   return relative && !relative.startsWith("..") ? relative : file;
-}
+};
 
-function toIssue(
+const toIssue = (
   issue: z.core.$ZodIssue,
   locate: (keyPath: PropertyKey[]) => Pick<ManifestIssue, "line" | "column">,
-): ManifestIssue {
+): ManifestIssue => {
   let keyPath = issue.path;
   let { message } = issue;
 
@@ -150,14 +150,14 @@ function toIssue(
   }
 
   return { path: keyPath.map(String).join("."), message, ...locate(keyPath) };
-}
+};
 
 /** Maps a key path to the closest YAML node position (falls back to parents when the key is missing) */
-function locateNode(
+const locateNode = (
   doc: Document,
   lineCounter: LineCounter,
   keyPath: PropertyKey[],
-): Pick<ManifestIssue, "line" | "column"> {
+): Pick<ManifestIssue, "line" | "column"> => {
   for (let depth = keyPath.length; depth >= 0; depth -= 1) {
     const node: unknown =
       depth === 0 ? doc.contents : doc.getIn(keyPath.slice(0, depth) as unknown[], true);
@@ -170,12 +170,12 @@ function locateNode(
   }
 
   return {};
-}
+};
 
-function resolveFleetRoot(
+const resolveFleetRoot = (
   manifestDir: string,
   spec: string | undefined,
-): { root: string } | { error: string } {
+): { root: string } | { error: string } => {
   if (spec === undefined) {
     return { root: manifestDir };
   }
@@ -187,14 +187,14 @@ function resolveFleetRoot(
   }
 
   return { root: path.resolve(manifestDir, slashed) };
-}
+};
 
-function resolveManifest(
+const resolveManifest = (
   raw: RawManifest,
   manifestDir: string,
   file: string,
   locate: (keyPath: PropertyKey[]) => Pick<ManifestIssue, "line" | "column">,
-): Manifest {
+): Manifest => {
   const issues: ManifestIssue[] = [];
   const fleet = resolveFleetRoot(manifestDir, raw.root);
 
@@ -293,4 +293,4 @@ function resolveManifest(
     summary,
     projects,
   };
-}
+};

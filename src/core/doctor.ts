@@ -32,7 +32,7 @@ export interface DoctorReport {
 }
 
 /** The manifest's own git (when it lives under the fleet root) is not a leaf clone */
-function scanIgnores(manifest: Manifest): string[] {
+const scanIgnores = (manifest: Manifest): string[] => {
   const absolute = manifest.manifestDir;
 
   if (
@@ -45,18 +45,18 @@ function scanIgnores(manifest: Manifest): string[] {
   const relative = path.relative(manifest.root, absolute).split(path.sep).join("/");
 
   return relative ? [relative] : [];
-}
+};
 
 /** Remote checks run once per host; local remotes (`file://`, paths) count as one "local" host */
-function hostOf(url: string): string | undefined {
+const hostOf = (url: string): string | undefined => {
   if (url.startsWith("file:") || path.isAbsolute(url)) {
     return "local";
   }
 
   return normalizeGitUrl(url)?.split("/")[0];
-}
+};
 
-export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport> {
+export const doctor = async (options: DoctorOptions = {}): Promise<DoctorReport> => {
   const checks: Check[] = [];
   const add = (check: Check) => checks.push(check);
 
@@ -178,4 +178,4 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
   }
 
   return { checks, manifest, failed: checks.some((check) => check.level === "fail") };
-}
+};

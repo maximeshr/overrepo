@@ -39,7 +39,7 @@ export class ManifestError extends OverrepoError {
   }
 }
 
-function formatIssues(file: string | undefined, issues: ManifestIssue[]): string {
+const formatIssues = (file: string | undefined, issues: ManifestIssue[]): string => {
   const lines = issues.map((issue) => {
     const location = [file, issue.line, issue.column]
       .filter((part) => part !== undefined)
@@ -54,12 +54,12 @@ function formatIssues(file: string | undefined, issues: ManifestIssue[]): string
     issues.length > 1 ? `Invalid manifest (${issues.length} issues):` : "Invalid manifest:";
 
   return [header, ...lines.map((line) => `  - ${line}`)].join("\n");
-}
+};
 
-export function errorMessage(error: unknown): string {
+export const errorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }
 
   return String(error);
-}
+};
