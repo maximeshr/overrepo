@@ -2,14 +2,8 @@ import type { Readable } from "node:stream";
 import { execa } from "execa";
 import { isGitRepo } from "../git/git.ts";
 import type { Manifest, Project } from "./model.ts";
-import {
-  failed,
-  forEachProject,
-  ok,
-  skipped,
-  type ProjectResult,
-  type RunEvent,
-} from "./runner.ts";
+import { failed, forEachProject, ok, skipped } from "./runner.ts";
+import type { ProjectResult, RunEvent } from "./runner.ts";
 
 type OutputStream = "stdout" | "stderr";
 
@@ -19,73 +13,102 @@ export interface OutputLine {
 }
 
 export interface ExecValue {
+  /** Exit code of the command, `undefined` when it did not exit (timeout, abort) */
   exitCode: number | undefined;
-  /** Captured output, only when `capture` is enabled. */
+  /** Captured output, only when `capture` is enabled */
   output?: OutputLine[];
 }
 
 export interface ExecOptions {
-  /** A single string runs through the shell; an array runs the binary directly (no quoting issues). */
+  /** A single string runs through the shell; an array runs the binary directly (no quoting issues) */
   command: string | string[];
+  /** Projects to run the command in */
   projects: Project[];
+  /** Projects run in parallel, 1 by default */
   concurrency?: number;
   /** Seconds. No timeout by default: builds and installs can legitimately take long. */
   timeout?: number;
+  /** Kills the running commands and skips the rest once aborted */
   signal?: AbortSignal;
   /** `inherit` hands the terminal to the child (sequential, interactive use). Default `pipe`. */
   stdio?: "pipe" | "inherit";
-  /** Keep every output line in the result (JSON / grouped output). */
+  /** Keep every output line in the result (JSON / grouped output) */
   capture?: boolean;
-  /** Streaming callback, called line by line in `pipe` mode. */
+  /** Streaming callback, called line by line in `pipe` mode */
   onOutput?: (project: Project, line: OutputLine) => void;
+  /** Called when a project starts and when it is done */
   onEvent?: (event: RunEvent<ExecValue>) => void;
-  /** Extra environment variables for the child. */
+  /** Extra environment variables for the child */
   env?: Record<string, string>;
 }
 
-function forEachLine(
+const forEachLine = async (
   stream: Readable | null | undefined,
   onLine: (line: string) => void,
-): Promise<void> {
-  if (!stream) return Promise.resolve();
-  stream.setEncoding("utf8");
+): Promise<void> => {
+  if (!stream) {
+    return;
+  }
+
+  stream.setEncoding("utf-8");
   let pending = "";
   stream.on("data", (chunk: string) => {
-    const parts = (pending + chunk).split(/\r?\n/);
+    const parts = (pending + chunk).split(/\r?\n/u);
     pending = parts.pop() ?? "";
-    for (const part of parts) onLine(part);
+
+    for (const part of parts) {
+      onLine(part);
+    }
   });
-  return new Promise((resolve) => {
-    const flush = () => {
-      if (pending) onLine(pending);
-      pending = "";
-      resolve();
-    };
-    stream.once("end", flush);
-    stream.once("close", flush);
-    stream.once("error", flush);
-  });
-}
+
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+
+  const flush = () => {
+    if (pending) {
+      onLine(pending);
+    }
+
+    pending = "";
+    resolve(undefined);
+  };
+
+  stream.once("end", flush);
+  stream.once("close", flush);
+  stream.once("error", flush);
+  await promise;
+};
 
 /** Runs a command in each selected project directory. Projects that are not cloned are skipped. */
-export async function execInProjects(
+export const execInProjects = async (
   manifest: Manifest,
   options: ExecOptions,
-): Promise<ProjectResult<ExecValue>[]> {
-  const [file, ...args] = typeof options.command === "string" ? [options.command] : options.command;
-  if (!file) throw new Error("empty command");
-  const shell = typeof options.command === "string";
+): Promise<ProjectResult<ExecValue>[]> => {
+  const [file, ...args] = Array.isArray(options.command) ? options.command : [options.command];
+
+  if (file === undefined || file === "") {
+    throw new Error("empty command");
+  }
+
+  const shell = !Array.isArray(options.command);
   const stdio = options.stdio ?? "pipe";
 
-  return forEachProject<ExecValue>(
+  return await forEachProject<ExecValue>(
     options.projects,
     async (project) => {
-      if (!isGitRepo(project.dir)) return skipped("not cloned");
+      if (!isGitRepo(project.dir)) {
+        return skipped("not cloned");
+      }
+
       const output: OutputLine[] = [];
+
       const emit = (stream: OutputStream) => (line: string) => {
-        if (options.capture) output.push({ stream, line });
+        if (options.capture === true) {
+          output.push({ stream, line });
+        }
+
         options.onOutput?.(project, { stream, line });
       };
+
       const child = execa(file, args, {
         cwd: project.dir,
         shell,
@@ -94,9 +117,12 @@ export async function execInProjects(
         stderr: stdio,
         buffer: false,
         reject: false,
-        timeout: options.timeout ? options.timeout * 1000 : undefined,
+        timeout:
+          options.timeout !== undefined && options.timeout !== 0 && !Number.isNaN(options.timeout)
+            ? options.timeout * 1000
+            : undefined,
         cancelSignal: options.signal,
-        // With `shell: true`, killing the shell alone would orphan the actual command.
+        /** With `shell: true`, killing the shell alone would orphan the actual command */
         killDescendants: true,
         env: {
           OVERREPO_ROOT: manifest.root,
@@ -105,26 +131,39 @@ export async function execInProjects(
           ...options.env,
         },
       });
+
       const streams =
         stdio === "pipe"
           ? [forEachLine(child.stdout, emit("stdout")), forEachLine(child.stderr, emit("stderr"))]
           : [];
+
       const [result] = await Promise.all([child, ...streams]);
-      const value: ExecValue = {
-        exitCode: result.exitCode,
-        ...(options.capture ? { output } : {}),
-      };
-      if (result.isCanceled) return failed("interrupted", value);
-      if (result.timedOut) return failed("timed out", value);
+
+      const value: ExecValue = { exitCode: result.exitCode };
+
+      if (options.capture === true) {
+        value.output = output;
+      }
+
+      if (result.isCanceled) {
+        return failed("interrupted", value);
+      }
+
+      if (result.timedOut) {
+        return failed("timed out", value);
+      }
+
       if (result.failed) {
         const reason =
-          result.exitCode !== undefined
-            ? `exit code ${result.exitCode}`
-            : (result.shortMessage ?? "failed");
+          result.exitCode === undefined
+            ? (result.shortMessage ?? "failed")
+            : `exit code ${result.exitCode}`;
+
         return failed(reason, value);
       }
+
       return ok(undefined, value);
     },
     { concurrency: options.concurrency ?? 1, signal: options.signal, onEvent: options.onEvent },
   );
-}
+};

@@ -5,10 +5,25 @@ import { OverrepoError } from "../core/errors.ts";
 
 export interface GitRunOptions {
   cwd?: string;
-  /** Milliseconds; the process is killed when exceeded. */
+  /** Milliseconds. The process is killed when exceeded */
   timeout?: number;
   signal?: AbortSignal;
 }
+
+const failureReason = (
+  stderr: string,
+  details: { exitCode?: number; timedOut: boolean; aborted: boolean },
+): string => {
+  if (details.aborted) {
+    return "interrupted";
+  }
+
+  if (details.timedOut) {
+    return "timed out";
+  }
+
+  return lastMeaningfulLine(stderr) || `exited with code ${details.exitCode ?? "?"}`;
+};
 
 export class GitError extends OverrepoError {
   readonly args: string[];
@@ -21,11 +36,8 @@ export class GitError extends OverrepoError {
     stderr: string,
     details: { exitCode?: number; timedOut: boolean; aborted: boolean },
   ) {
-    const reason = details.aborted
-      ? "interrupted"
-      : details.timedOut
-        ? "timed out"
-        : lastMeaningfulLine(stderr) || `exited with code ${details.exitCode ?? "?"}`;
+    const reason = failureReason(stderr, details);
+
     super(`git ${args[0] ?? ""} failed: ${reason}`);
     this.name = "GitError";
     this.args = args;
@@ -35,121 +47,140 @@ export class GitError extends OverrepoError {
   }
 }
 
-function lastMeaningfulLine(stderr: string): string {
+const lastMeaningfulLine = (stderr: string): string => {
   const lines = stderr
-    .split(/\r?\n/)
+    .split(/\r?\n/u)
     .map((line) => line.trim())
-    .filter((line) => line && !/^(hint|warning):/i.test(line));
-  const fatal = lines.find((line) => /^(fatal|error):/i.test(line));
-  return (fatal ?? lines.at(-1) ?? "").replace(/^(fatal|error):\s*/i, "");
-}
+    .filter((line) => line !== "" && !/^(?:hint|warning):/iu.test(line));
+
+  const fatal = lines.find((line) => /^(?:fatal|error):/iu.test(line));
+
+  return (fatal ?? lines.at(-1) ?? "").replace(/^(?:fatal|error):\s*/iu, "");
+};
 
 let sshCommandProbe: Promise<boolean> | undefined;
 
-/** True when the user configured `core.sshCommand`, which `GIT_SSH_COMMAND` would override. */
-function hasCustomSshCommand(): Promise<boolean> {
+/** True when the user configured `core.sshCommand`, which `GIT_SSH_COMMAND` would override */
+const hasCustomSshCommand = async (): Promise<boolean> => {
   sshCommandProbe ??= execa("git", ["config", "--get", "core.sshCommand"], {
     reject: false,
     stdin: "ignore",
-  }).then(
-    (result) => result.exitCode === 0 && result.stdout.trim() !== "",
-    () => false,
-  );
-  return sshCommandProbe;
-}
+  })
+    .then((result) => result.exitCode === 0 && result.stdout.trim() !== "")
+    .catch(() => false);
+
+  return await sshCommandProbe;
+};
 
 /**
  * Environment that guarantees git never waits for interactive input:
- * no credential prompt, and SSH in batch mode unless the user customized SSH.
+ * no credential prompt, and SSH in batch mode unless the user customized SSH
  */
-async function nonInteractiveEnv(): Promise<Record<string, string>> {
-  const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !(await hasCustomSshCommand())) {
-    env.GIT_SSH_COMMAND = "ssh -o BatchMode=yes";
+const nonInteractiveEnv = async (): Promise<Record<string, string>> => {
+  const env = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
+
+  if (
+    (process.env.GIT_SSH_COMMAND === undefined || process.env.GIT_SSH_COMMAND === "") &&
+    (process.env.GIT_SSH === undefined || process.env.GIT_SSH === "") &&
+    !(await hasCustomSshCommand())
+  ) {
+    return { ...env, GIT_SSH_COMMAND: "ssh -o BatchMode=yes" };
   }
+
   return env;
-}
+};
+
+/** Node.js system errors name their cause in `code`, e.g. `ENOENT` */
+const hasCode = (error: unknown): error is { code: unknown } =>
+  typeof error === "object" && error !== null && "code" in error;
 
 /** Runs git and returns trimmed stdout. Throws `GitError` on failure. */
-async function git(args: string[], options: GitRunOptions = {}): Promise<string> {
+const git = async (args: string[], options: GitRunOptions = {}): Promise<string> => {
   const result = await execa("git", args, {
     cwd: options.cwd,
     timeout: options.timeout,
     cancelSignal: options.signal,
-    // git spawns ssh and remote helpers that must not outlive a timeout or Ctrl+C.
+    /** git spawns ssh and remote helpers that must not outlive a timeout or Ctrl+C */
     killDescendants: true,
     env: await nonInteractiveEnv(),
     stdin: "ignore",
     reject: false,
     stripFinalNewline: true,
   });
+
   if (result.failed) {
-    if (
-      result.code === "ENOENT" ||
-      (result.cause as NodeJS.ErrnoException | undefined)?.code === "ENOENT"
-    ) {
+    if (result.code === "ENOENT" || (hasCode(result.cause) && result.cause.code === "ENOENT")) {
       throw new OverrepoError("git executable not found in PATH", 2);
     }
-    throw new GitError(args, String(result.stderr ?? ""), {
+
+    throw new GitError(args, result.stderr ?? "", {
       exitCode: result.exitCode,
-      timedOut: Boolean(result.timedOut),
-      aborted: Boolean(result.isCanceled),
+      timedOut: result.timedOut,
+      aborted: result.isCanceled,
     });
   }
-  return String(result.stdout ?? "");
-}
 
-export async function gitVersion(): Promise<string | undefined> {
+  return result.stdout ?? "";
+};
+
+export const gitVersion = async (): Promise<string | undefined> => {
   try {
-    return (await git(["--version"])).replace(/^git version\s*/, "");
+    const output = await git(["--version"]);
+
+    return output.replace(/^git version\s*/u, "");
   } catch {
     return undefined;
   }
-}
+};
 
-/** A directory is a repo when it has a `.git` directory or file (worktrees, submodules). */
-export function isGitRepo(dir: string): boolean {
-  return existsSync(path.join(dir, ".git"));
-}
+/** A directory is a repo when it has a `.git` directory or file (worktrees, submodules) */
+export const isGitRepo = (dir: string): boolean => existsSync(path.join(dir, ".git"));
 
-export function isDirectory(dir: string): boolean {
+export const isDirectory = (dir: string): boolean => {
   try {
     return statSync(dir).isDirectory();
   } catch {
     return false;
   }
-}
+};
 
 /** Clones the remote default branch. Blobs are fetched on demand. */
-export async function clone(url: string, dest: string, options: GitRunOptions = {}): Promise<void> {
+export const clone = async (
+  url: string,
+  dest: string,
+  options: GitRunOptions = {},
+): Promise<void> => {
   await git(["clone", "--no-progress", "--filter=blob:none", "--", url, dest], options);
-}
+};
 
-export async function originUrl(
+export const originUrl = async (
   dir: string,
   options: GitRunOptions = {},
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   try {
     return (await git(["remote", "get-url", "origin"], { ...options, cwd: dir })) || undefined;
   } catch {
     return undefined;
   }
-}
+};
 
 export interface RepoStatus {
-  /** `undefined` when HEAD is detached. */
+  /** `undefined` when HEAD is detached */
   branch: string | undefined;
-  /** Commit hash (short) of HEAD, `undefined` on an empty repo. */
+  /** Commit hash (short) of HEAD, `undefined` on an empty repo */
   head: string | undefined;
+  /** Upstream branch, `undefined` when none is set */
   upstream: string | undefined;
+  /** Commits on HEAD that are not on the upstream */
   ahead: number;
+  /** Commits on the upstream that are not on HEAD */
   behind: number;
-  /** Number of changed/untracked entries. */
+  /** Number of changed/untracked entries */
   changes: number;
 }
 
-/** Parses `git status --porcelain=v2 --branch`. */
-export function parseStatus(output: string): RepoStatus {
+/** Parses `git status --porcelain=v2 --branch` */
+export const parseStatus = (output: string): RepoStatus => {
   const status: RepoStatus = {
     branch: undefined,
     head: undefined,
@@ -158,8 +189,12 @@ export function parseStatus(output: string): RepoStatus {
     behind: 0,
     changes: 0,
   };
+
   for (const line of output.split("\n")) {
-    if (!line) continue;
+    if (!line) {
+      continue;
+    }
+
     if (line.startsWith("# branch.oid ")) {
       const oid = line.slice("# branch.oid ".length);
       status.head = oid === "(initial)" ? undefined : oid.slice(0, 7);
@@ -169,111 +204,124 @@ export function parseStatus(output: string): RepoStatus {
     } else if (line.startsWith("# branch.upstream ")) {
       status.upstream = line.slice("# branch.upstream ".length);
     } else if (line.startsWith("# branch.ab ")) {
-      const match = /\+(\d+) -(\d+)/.exec(line);
-      if (match) {
-        status.ahead = Number(match[1]);
-        status.behind = Number(match[2]);
+      const counts = /\+(?<ahead>\d+) -(?<behind>\d+)/u.exec(line)?.groups;
+
+      if (counts) {
+        status.ahead = Number(counts.ahead);
+        status.behind = Number(counts.behind);
       }
     } else if (!line.startsWith("#")) {
-      status.changes++;
+      status.changes += 1;
     }
   }
+
   return status;
-}
+};
 
-export async function repoStatus(dir: string, options: GitRunOptions = {}): Promise<RepoStatus> {
-  return parseStatus(await git(["status", "--porcelain=v2", "--branch"], { ...options, cwd: dir }));
-}
+export const repoStatus = async (dir: string, options: GitRunOptions = {}): Promise<RepoStatus> =>
+  parseStatus(await git(["status", "--porcelain=v2", "--branch"], { ...options, cwd: dir }));
 
-export async function fetch(dir: string, options: GitRunOptions = {}): Promise<void> {
+export const fetch = async (dir: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["fetch", "--prune", "--no-progress"], { ...options, cwd: dir });
-}
+};
 
-export async function pullFastForward(dir: string, options: GitRunOptions = {}): Promise<void> {
+export const pullFastForward = async (dir: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["pull", "--ff-only", "--no-progress"], { ...options, cwd: dir });
-}
+};
 
-export async function lsRemote(url: string, options: GitRunOptions = {}): Promise<void> {
+export const lsRemote = async (url: string, options: GitRunOptions = {}): Promise<void> => {
   await git(["ls-remote", "--exit-code", "--heads", url], options);
-}
+};
 
-/** Top-level tracked entries of `ref` (`dirs` end with `/`), or `undefined` when the revision is missing. */
-export async function trackedTopLevel(
+/** Top-level tracked entries of `ref` (`dirs` end with `/`), or `undefined` when the revision is missing */
+export const trackedTopLevel = async (
   dir: string,
   ref = "HEAD",
   options: GitRunOptions = {},
-): Promise<string[] | undefined> {
+): Promise<string[] | undefined> => {
   try {
     const output = await git(["ls-tree", "-z", ref], { ...options, cwd: dir });
+
     return output
       .split("\0")
       .filter(Boolean)
       .map((line) => {
         const [meta = "", name = ""] = line.split("\t");
+
         return meta.split(" ")[1] === "tree" ? `${name}/` : name;
       });
   } catch {
     return undefined;
   }
-}
+};
 
-/** True when `ref:file` exists (blob or tree). */
-export async function gitPathExists(
+/** True when `ref:file` exists (blob or tree) */
+export const gitPathExists = async (
   dir: string,
   ref: string,
   file: string,
   options: GitRunOptions = {},
-): Promise<boolean> {
+): Promise<boolean> => {
   try {
     await git(["cat-file", "-e", `${ref}:${file}`], { ...options, cwd: dir });
+
     return true;
   } catch {
     return false;
   }
-}
+};
 
-/** UTF-8 contents of `ref:file`, or `undefined` when it is missing or larger than `maxBytes`. */
-export async function readGitFile(
+/** UTF-8 contents of `ref:file`, or `undefined` when it is missing or larger than `maxBytes` */
+export const readGitFile = async (
   dir: string,
   ref: string,
   file: string,
   maxBytes: number,
   options: GitRunOptions = {},
-): Promise<string | undefined> {
+): Promise<string | undefined> => {
   try {
     const size = Number(await git(["cat-file", "-s", `${ref}:${file}`], { ...options, cwd: dir }));
-    if (!Number.isFinite(size) || size > maxBytes) return undefined;
+
+    if (!Number.isFinite(size) || size > maxBytes) {
+      return undefined;
+    }
+
     return await git(["show", `${ref}:${file}`], { ...options, cwd: dir });
   } catch {
     return undefined;
   }
-}
+};
 
 export interface CommitInfo {
-  /** Full commit hash. */
+  /** Full commit hash */
   sha: string;
-  /** First 7 characters of `sha` (fixed length, unlike `%h`, so cards stay stable). */
+  /** First 7 characters of `sha` (fixed length, unlike `%h`, so cards stay stable) */
   shortSha: string;
-  /** Committer date in UTC, ISO 8601 (`2026-01-31T09:15:00.000Z`). */
+  /** Committer date in UTC, ISO 8601 (`2026-01-31T09:15:00.000Z`) */
   date: string;
 }
 
-/** The commit `ref` points to, or `undefined` when the revision is missing. */
-export async function commitInfo(
+/** The commit `ref` points to, or `undefined` when the revision is missing */
+export const commitInfo = async (
   dir: string,
   ref: string,
   options: GitRunOptions = {},
-): Promise<CommitInfo | undefined> {
+): Promise<CommitInfo | undefined> => {
   try {
     const output = await git(["log", "-1", "--format=%H %cI", ref, "--"], {
       ...options,
       cwd: dir,
     });
+
     const [sha = "", iso = ""] = output.trim().split(" ");
     const time = Date.parse(iso);
-    if (!/^[0-9a-f]{7,}$/.test(sha) || Number.isNaN(time)) return undefined;
+
+    if (!/^[0-9a-f]{7,}$/u.test(sha) || Number.isNaN(time)) {
+      return undefined;
+    }
+
     return { sha, shortSha: sha.slice(0, 7), date: new Date(time).toISOString() };
   } catch {
     return undefined;
   }
-}
+};

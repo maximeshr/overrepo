@@ -1,7 +1,9 @@
 import { qualityGate } from "quality-gate/vite";
 import { defineConfig } from "vite-plus";
 
-// OKQ base config (lint, fmt, test coverage, staged); only overrepo's structure is added here.
+/**
+ * OKQ base config (lint, fmt, test coverage, staged); only overrepo's structure is added here
+ */
 export default defineConfig({
   ...qualityGate,
   pack: {
@@ -16,7 +18,7 @@ export default defineConfig({
   test: {
     ...qualityGate.test,
     include: ["tests/**/*.test.ts"],
-    // Integration tests create real git repositories.
+    /** Integration tests create real git repositories */
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

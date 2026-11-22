@@ -3,15 +3,8 @@ import { UsageError } from "../../core/errors.ts";
 import { execInProjects } from "../../core/exec.ts";
 import type { Manifest, Project } from "../../core/model.ts";
 import type { Io } from "../io.ts";
-import {
-  contextOf,
-  load,
-  positiveInt,
-  positiveNumber,
-  select,
-  withSelection,
-  type SelectionOptions,
-} from "../options.ts";
+import { contextOf, load, positiveInt, positiveNumber, select, withSelection } from "../options.ts";
+import type { SelectionOptions } from "../options.ts";
 import { json, prefixer, printSummary, projectColor, resultLine } from "../output.ts";
 import type { Register } from "./types.ts";
 
@@ -25,8 +18,8 @@ interface ExecFlags extends SelectionOptions {
   json?: boolean;
 }
 
-function withExecOptions(command: Command): Command {
-  return withSelection(command)
+const withExecOptions = (command: Command): Command =>
+  withSelection(command)
     .option("--parallel", "run in parallel")
     .option("-j, --concurrency <n>", "run in parallel with this concurrency", positiveInt)
     .option(
@@ -35,32 +28,42 @@ function withExecOptions(command: Command): Command {
     )
     .option("--timeout <seconds>", "kill the command after this delay", positiveNumber)
     .option("--json", "capture output and print results as JSON");
-}
 
 /** Runs one command in each selected project. Returns the exit code. */
-async function runInProjects(
+const runInProjects = async (
   io: Io,
   manifest: Manifest,
   projects: Project[],
   command: string | string[],
   flags: ExecFlags,
-): Promise<number> {
-  const concurrency = flags.concurrency ?? (flags.parallel ? manifest.defaults.concurrency : 1);
+): Promise<number> => {
+  const concurrency =
+    flags.concurrency ?? (flags.parallel === true ? manifest.defaults.concurrency : 1);
+
   const mode: OutputMode = flags.output ?? "prefix";
-  if (!["prefix", "grouped", "raw"].includes(mode))
+
+  if (!["prefix", "grouped", "raw"].includes(mode)) {
     throw new UsageError(`--output must be prefix, grouped or raw (got "${mode}")`);
-  if (mode === "raw" && concurrency > 1)
+  }
+
+  if (mode === "raw" && concurrency > 1) {
     throw new UsageError("--output raw cannot be combined with parallel execution");
-  if (mode === "raw" && flags.json)
+  }
+
+  if (mode === "raw" && flags.json === true) {
     throw new UsageError("--output raw cannot be combined with --json");
+  }
+
   if (projects.length === 0) {
     io.error(io.colors.yellow("no project matches the selection\n"));
+
     return 0;
   }
 
   const { colors } = io;
   const prefix = prefixer(colors, projects);
   const width = Math.min(28, Math.max(0, ...projects.map((project) => project.name.length)));
+
   const results = await execInProjects(manifest, {
     command,
     projects,
@@ -68,34 +71,53 @@ async function runInProjects(
     timeout: flags.timeout,
     signal: io.signal,
     stdio: mode === "raw" ? "inherit" : "pipe",
-    capture: flags.json || mode === "grouped",
+    capture: flags.json === true || mode === "grouped",
     env:
-      io.stdoutIsTTY && mode !== "raw" && !process.env.NO_COLOR ? { FORCE_COLOR: "1" } : undefined,
+      io.stdoutIsTTY &&
+      mode !== "raw" &&
+      (process.env.NO_COLOR === undefined || process.env.NO_COLOR === "")
+        ? { FORCE_COLOR: "1" }
+        : undefined,
     onOutput:
-      flags.json || mode !== "prefix"
+      flags.json === true || mode !== "prefix"
         ? undefined
-        : (project, { line }) => io.write(`${prefix(project)} ${line}\n`),
+        : (project, { line }) => {
+            io.write(`${prefix(project)} ${line}\n`);
+          },
     onEvent: (event) => {
-      if (flags.json) return;
+      if (flags.json === true) {
+        return;
+      }
+
       if (event.type === "start" && mode === "raw") {
         io.write(
           `\n${projectColor(colors, event.project.name)(colors.bold(`▸ ${event.project.name}`))}\n`,
         );
       }
-      if (event.type !== "done") return;
+
+      if (event.type !== "done") {
+        return;
+      }
+
       const { result } = event;
+
       if (mode === "grouped" && result.value?.output) {
         io.write(
           `\n${projectColor(colors, result.project.name)(colors.bold(`▸ ${result.project.name}`))}\n`,
         );
-        for (const { line } of result.value.output) io.write(`${line}\n`);
+
+        for (const { line } of result.value.output) {
+          io.write(`${line}\n`);
+        }
       }
-      if (result.status !== "ok" || mode !== "prefix")
+
+      if (result.status !== "ok" || mode !== "prefix") {
         io.error(`${resultLine(colors, result, width)}\n`);
+      }
     },
   });
 
-  if (flags.json) {
+  if (flags.json === true) {
     json(
       io,
       results.map((result) => ({
@@ -117,10 +139,12 @@ async function runInProjects(
             .join("\n") ?? "",
       })),
     );
+
     return results.some((result) => result.status === "failed") ? 1 : 0;
   }
+
   return printSummary(io, results);
-}
+};
 
 export const registerExec: Register = (program, run, io) => {
   withExecOptions(
@@ -130,11 +154,13 @@ export const registerExec: Register = (program, run, io) => {
       .argument("<command...>", "command to run; a single quoted argument goes through the shell")
       .passThroughOptions(),
   ).action(
-    run(async (commandArgs: string[], options: ExecFlags, command) => {
+    run(async (commandArgs: string[], options: ExecFlags, command: Command) => {
       const manifest = await load(contextOf(io, command));
       const projects = select(manifest, options, true);
-      const cmd = commandArgs.length === 1 ? (commandArgs[0] as string) : commandArgs;
-      return runInProjects(io, manifest, projects, cmd, options);
+      const [single] = commandArgs;
+      const cmd = commandArgs.length === 1 && single !== undefined ? single : commandArgs;
+
+      return await runInProjects(io, manifest, projects, cmd, options);
     }),
   );
 };

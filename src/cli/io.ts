@@ -3,35 +3,46 @@ import picocolors from "picocolors";
 export type Colors = ReturnType<typeof picocolors.createColors>;
 
 export interface Io {
+  /** Directory the command runs from */
   cwd: string;
-  write(text: string): void;
-  error(text: string): void;
-  /** Reads all of stdin (for `import`). */
-  readStdin(): Promise<string>;
+  /** Writes to stdout */
+  write: (text: string) => void;
+  /** Writes to stderr */
+  error: (text: string) => void;
+  /** Reads all of stdin (for `import`) */
+  readStdin: () => Promise<string>;
+  /** True when stdin is a terminal, so `import` needs a file */
   stdinIsTTY: boolean;
+  /** True when stdout is a terminal, so child processes keep their colors */
   stdoutIsTTY: boolean;
-  /** Progress bars are drawn on stderr only when it is a terminal. */
+  /** Progress bars are drawn on stderr only when it is a terminal */
   stderrIsTTY: boolean;
+  /** Color functions, plain text when colors are not supported */
   colors: Colors;
-  /** Aborted on Ctrl+C. */
+  /** Aborted on Ctrl+C */
   signal: AbortSignal;
 }
 
-export function processIo(signal: AbortSignal): Io {
-  return {
-    cwd: process.cwd(),
-    write: (text) => process.stdout.write(text),
-    error: (text) => process.stderr.write(text),
-    readStdin: async () => {
-      const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin)
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
-      return Buffer.concat(chunks).toString("utf8");
-    },
-    stdinIsTTY: Boolean(process.stdin.isTTY),
-    stdoutIsTTY: Boolean(process.stdout.isTTY),
-    stderrIsTTY: Boolean(process.stderr.isTTY),
-    colors: picocolors.createColors(picocolors.isColorSupported),
-    signal,
-  };
-}
+export const processIo = (signal: AbortSignal): Io => ({
+  cwd: process.cwd(),
+  write: (text) => {
+    process.stdout.write(text);
+  },
+  error: (text) => {
+    process.stderr.write(text);
+  },
+  readStdin: async () => {
+    const chunks: Buffer[] = [];
+
+    for await (const chunk of process.stdin) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+    }
+
+    return Buffer.concat(chunks).toString("utf-8");
+  },
+  stdinIsTTY: process.stdin.isTTY,
+  stdoutIsTTY: process.stdout.isTTY,
+  stderrIsTTY: process.stderr.isTTY,
+  colors: picocolors.createColors(picocolors.isColorSupported),
+  signal,
+});

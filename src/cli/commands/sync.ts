@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import { sync } from "../../core/sync.ts";
 import {
   contextOf,
@@ -7,8 +8,8 @@ import {
   positiveNumber,
   select,
   withSelection,
-  type SelectionOptions,
 } from "../options.ts";
+import type { SelectionOptions } from "../options.ts";
 import { json, printSummary, resultLine } from "../output.ts";
 import type { Register } from "./types.ts";
 
@@ -35,11 +36,12 @@ export const registerSync: Register = (program, run, io) => {
       .option("-q, --quiet", "only print failures and the summary")
       .option("--json", "print results as JSON"),
   ).action(
-    run(async (options: SyncFlags, command) => {
+    run(async (options: SyncFlags, command: Command) => {
       const context = contextOf(io, command);
       const manifest = await load(context);
       const projects = select(manifest, options);
       const width = Math.min(28, Math.max(0, ...projects.map((project) => project.name.length)));
+
       const report = await sync(manifest, {
         projects,
         pull: options.pull,
@@ -49,13 +51,19 @@ export const registerSync: Register = (program, run, io) => {
         retries: options.retries,
         signal: io.signal,
         onEvent: (event) => {
-          if (options.json || event.type !== "done") return;
-          if (options.quiet && event.result.status !== "failed") return;
+          if (options.json === true || event.type !== "done") {
+            return;
+          }
+
+          if (options.quiet === true && event.result.status !== "failed") {
+            return;
+          }
+
           io.error(`${resultLine(io.colors, event.result, width)}\n`);
         },
       });
 
-      if (options.json) {
+      if (options.json === true) {
         json(io, {
           results: report.results.map((result) => ({
             name: result.project.name,
@@ -66,11 +74,12 @@ export const registerSync: Register = (program, run, io) => {
             error: result.error ?? null,
           })),
         });
+
         return report.results.some((result) => result.status === "failed") ? 1 : 0;
       }
 
       return printSummary(io, report.results, {
-        label: options.dryRun ? "sync (dry run)" : "sync",
+        label: options.dryRun === true ? "sync (dry run)" : "sync",
       });
     }),
   );

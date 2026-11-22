@@ -4,64 +4,82 @@ import pLimit from "p-limit";
 import { OverrepoError } from "../core/errors.ts";
 import type { Manifest, Project } from "../core/model.ts";
 import { normalizeGitUrl } from "../core/urls.ts";
-import { analyzeProject, type Analysis } from "./analyze.ts";
+import { analyzeProject } from "./analyze.ts";
+import type { Analysis } from "./analyze.ts";
 import { extractManual } from "./markdown.ts";
-import { renderCard, type DependencyLink } from "./render-card.ts";
+import { renderCard } from "./render-card.ts";
+import type { DependencyLink } from "./render-card.ts";
 import { renderIndex } from "./render-index.ts";
 import type { Detector } from "./types.ts";
 
 export type FileStatus = "created" | "updated" | "unchanged" | "stale" | "orphan" | "removed";
 
 export interface ContextFile {
-  /** Path relative to the root. */
+  /** Path relative to the root */
   path: string;
   status: FileStatus;
   project?: string;
 }
 
 export interface ContextOptions {
-  /** Cards to (re)generate; the index always covers every project. Defaults to all. */
+  /** Cards to (re)generate, all by default. The index always covers every project. */
   projects?: Project[];
-  /** Compare instead of writing; stale files are reported with status `stale` / `orphan`. */
+  /** Compare instead of writing. Stale files are reported with status `stale` or `orphan` */
   check?: boolean;
-  /** Delete cards of projects no longer in the manifest. */
+  /** Delete cards of projects no longer in the manifest */
   prune?: boolean;
+  /** Projects analyzed in parallel, `defaults.concurrency` of the manifest by default */
   concurrency?: number;
+  /** Detectors to run, `defaultDetectors` by default */
   detectors?: Detector[];
-  /** Called each time a project has been analyzed. */
+  /** Called each time a project has been analyzed */
   onProgress?: (done: number, total: number, project: Project) => void;
 }
 
 export interface ContextReport {
+  /** Every card and index file, with what happened to it */
   files: ContextFile[];
-  /** True when `check` found at least one stale, missing or orphan file. */
+  /** True when `check` found at least one stale, missing or orphan file */
   stale: boolean;
 }
 
-export function cardPath(manifest: Manifest, project: Project): string {
-  return `${manifest.summary.outDir}/${project.path}.md`;
-}
+export const cardPath = (manifest: Manifest, project: Project): string =>
+  `${manifest.summary.outDir}/${project.path}.md`;
 
-async function readIfExists(file: string): Promise<string | undefined> {
+const readIfExists = async (file: string): Promise<string | undefined> => {
   try {
-    return await readFile(file, "utf8");
+    return await readFile(file, "utf-8");
   } catch {
     return undefined;
   }
-}
+};
 
-/** Links projects through published package names and git URLs found in dependency specs. */
-function internalDependencies(
+const byName = (a: DependencyLink, b: DependencyLink): number => {
+  if (a.name < b.name) {
+    return -1;
+  }
+
+  return a.name > b.name ? 1 : 0;
+};
+
+/** Links projects through published package names and git URLs found in dependency specs */
+const internalDependencies = (
   analyses: Analysis[],
   cardOf: (project: Project) => string,
-): Map<string, { uses: DependencyLink[]; usedBy: DependencyLink[] }> {
+): Map<string, { uses: DependencyLink[]; usedBy: DependencyLink[] }> => {
   const byPackage = new Map<string, Project>();
   const byUrl = new Map<string, Project>();
+
   for (const analysis of analyses) {
-    for (const id of analysis.packages)
+    for (const id of analysis.packages) {
       byPackage.set(`${id.ecosystem}:${id.name}`, analysis.project);
+    }
+
     const url = analysis.project.url && normalizeGitUrl(analysis.project.url);
-    if (url) byUrl.set(url, analysis.project);
+
+    if (url !== undefined && url !== "") {
+      byUrl.set(url, analysis.project);
+    }
   }
 
   const links = new Map(
@@ -70,154 +88,200 @@ function internalDependencies(
       { uses: new Map<string, DependencyLink>(), usedBy: new Map<string, DependencyLink>() },
     ]),
   );
+
   const connect = (from: Project, to: Project, via: string) => {
-    if (from.name === to.name) return;
+    if (from.name === to.name) {
+      return;
+    }
+
     const outgoing = links.get(from.name)?.uses;
-    if (outgoing && !outgoing.has(to.name))
+
+    if (outgoing && !outgoing.has(to.name)) {
       outgoing.set(to.name, { name: to.name, card: cardOf(to), via });
+    }
+
     const incoming = links.get(to.name)?.usedBy;
-    if (incoming && !incoming.has(from.name))
+
+    if (incoming && !incoming.has(from.name)) {
       incoming.set(from.name, { name: from.name, card: cardOf(from), via });
+    }
   };
 
   for (const analysis of analyses) {
     for (const id of analysis.dependencies) {
       const target = byPackage.get(`${id.ecosystem}:${id.name}`);
-      if (target)
-        connect(analysis.project, target, `${id.ecosystem} package ${"`"}${id.name}${"`"}`);
+
+      if (target) {
+        connect(analysis.project, target, `${id.ecosystem} package \`${id.name}\``);
+      }
     }
+
     for (const reference of analysis.references) {
       const url = normalizeGitUrl(reference);
-      const target = url ? byUrl.get(url) : undefined;
-      if (target) connect(analysis.project, target, "git dependency");
+      const target = url !== undefined && url !== "" ? byUrl.get(url) : undefined;
+
+      if (target) {
+        connect(analysis.project, target, "git dependency");
+      }
     }
   }
 
-  const byName = (a: DependencyLink, b: DependencyLink) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   return new Map(
     [...links].map(([name, { uses, usedBy }]) => [
       name,
-      { uses: [...uses.values()].sort(byName), usedBy: [...usedBy.values()].sort(byName) },
+      { uses: [...uses.values()].toSorted(byName), usedBy: [...usedBy.values()].toSorted(byName) },
     ]),
   );
-}
+};
 
-async function listMarkdown(dir: string, root: string): Promise<string[]> {
+const listMarkdown = async (dir: string, root: string): Promise<string[]> => {
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+
   const files = await Promise.all(
     entries.map(async (entry) => {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) return listMarkdown(full, root);
+
+      if (entry.isDirectory()) {
+        return await listMarkdown(full, root);
+      }
+
       return entry.name.endsWith(".md")
         ? [path.relative(root, full).split(path.sep).join("/")]
         : [];
     }),
   );
+
   return files.flat();
-}
+};
 
 /** Generates `index.md` and one card per project. Writes only files whose content changed. */
-export async function generateContext(
+export const generateContext = async (
   manifest: Manifest,
   options: ContextOptions = {},
-): Promise<ContextReport> {
+): Promise<ContextReport> => {
   const { summary } = manifest;
   const base = manifest.manifestDir;
   const cardOf = (project: Project) => cardPath(manifest, project);
   const collision = manifest.projects.find((project) => cardOf(project) === summary.index);
-  if (collision)
+
+  if (collision) {
     throw new OverrepoError(
       `project "${collision.name}" would overwrite the index (${summary.index})`,
       2,
     );
+  }
 
   const limit = pLimit(Math.max(1, options.concurrency ?? manifest.defaults.concurrency));
   let done = 0;
+
   const analyses = await Promise.all(
-    manifest.projects.map((project) =>
-      limit(async () => {
-        const analysis = await analyzeProject(
-          project,
-          summary.include,
-          options.detectors,
-          "origin/HEAD",
-        );
-        options.onProgress?.(++done, manifest.projects.length, project);
-        return analysis;
-      }),
+    manifest.projects.map(
+      async (project) =>
+        await limit(async () => {
+          const analysis = await analyzeProject(
+            project,
+            summary.include,
+            options.detectors,
+            "origin/HEAD",
+          );
+
+          options.onProgress?.((done += 1), manifest.projects.length, project);
+
+          return analysis;
+        }),
     ),
   );
+
   const dependencies = internalDependencies(analyses, cardOf);
 
-  const files: ContextFile[] = [];
   const emit = async (
     relative: string,
     render: (manual: string | undefined) => string,
     project?: string,
-  ) => {
+  ): Promise<ContextFile> => {
     const absolute = path.join(base, ...relative.split("/"));
     const existing = await readIfExists(absolute);
     const content = render(existing === undefined ? undefined : extractManual(existing));
+
     if (content === existing) {
-      files.push({ path: relative, status: "unchanged", project });
-      return;
+      return { path: relative, status: "unchanged", project };
     }
-    if (options.check) {
-      files.push({ path: relative, status: "stale", project });
-      return;
+
+    if (options.check === true) {
+      return { path: relative, status: "stale", project };
     }
+
     await mkdir(path.dirname(absolute), { recursive: true });
     await writeFile(absolute, content);
-    files.push({ path: relative, status: existing === undefined ? "created" : "updated", project });
+
+    return { path: relative, status: existing === undefined ? "created" : "updated", project };
   };
 
   const selected = new Set((options.projects ?? manifest.projects).map((project) => project.name));
-  for (const analysis of analyses) {
-    if (!selected.has(analysis.project.name)) continue;
-    const card = cardOf(analysis.project);
-    const deps = dependencies.get(analysis.project.name) ?? { uses: [], usedBy: [] };
-    await emit(
-      card,
-      (manual) =>
-        renderCard({
-          analysis,
-          card,
-          checkout: path.relative(base, analysis.project.dir).split(path.sep).join("/"),
-          uses: deps.uses,
-          usedBy: deps.usedBy,
-          config: summary,
-          manual,
-        }),
-      analysis.project.name,
-    );
-  }
 
-  await emit(summary.index, (manual) =>
-    renderIndex({
-      projects: manifest.projects,
-      index: summary.index,
-      cardOf,
-      manifestName: path.basename(manifest.file),
-      manual,
-    }),
+  const files = await Promise.all(
+    analyses
+      .filter((analysis) => selected.has(analysis.project.name))
+      .map(async (analysis) => {
+        const card = cardOf(analysis.project);
+        const deps = dependencies.get(analysis.project.name) ?? { uses: [], usedBy: [] };
+
+        return await emit(
+          card,
+          (manual) =>
+            renderCard({
+              analysis,
+              card,
+              checkout: path.relative(base, analysis.project.dir).split(path.sep).join("/"),
+              uses: deps.uses,
+              usedBy: deps.usedBy,
+              config: summary,
+              manual,
+            }),
+          analysis.project.name,
+        );
+      }),
+  );
+
+  files.push(
+    await emit(summary.index, (manual) =>
+      renderIndex({
+        projects: manifest.projects,
+        index: summary.index,
+        cardOf,
+        manifestName: path.basename(manifest.file),
+        manual,
+      }),
+    ),
   );
 
   const expected = new Set([summary.index, ...manifest.projects.map(cardOf)]);
-  for (const file of await listMarkdown(path.join(base, ...summary.outDir.split("/")), base)) {
-    if (expected.has(file)) continue;
-    const content = await readIfExists(path.join(base, ...file.split("/")));
-    if (!content?.includes("generated-by: overrepo")) continue;
-    if (options.prune && !options.check) {
-      await rm(path.join(base, ...file.split("/")));
-      files.push({ path: file, status: "removed" });
-    } else {
-      files.push({ path: file, status: "orphan" });
-    }
-  }
+  const listed = await listMarkdown(path.join(base, ...summary.outDir.split("/")), base);
+
+  const orphans = await Promise.all(
+    listed
+      .filter((file) => !expected.has(file))
+      .map(async (file): Promise<ContextFile | undefined> => {
+        const content = await readIfExists(path.join(base, ...file.split("/")));
+
+        if (content?.includes("generated-by: overrepo") !== true) {
+          return undefined;
+        }
+
+        if (options.prune === true && options.check !== true) {
+          await rm(path.join(base, ...file.split("/")));
+
+          return { path: file, status: "removed" };
+        }
+
+        return { path: file, status: "orphan" };
+      }),
+  );
+
+  files.push(...orphans.filter((file) => file !== undefined));
 
   return {
     files,
     stale: files.some((file) => file.status === "stale" || file.status === "orphan"),
   };
-}
+};
