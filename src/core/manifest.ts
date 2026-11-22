@@ -21,7 +21,7 @@ import type { RawManifest } from "./schema.ts";
 export interface LocateOptions {
   /** Directory to start searching from (walks up to the filesystem root). Defaults to `process.cwd()`. */
   cwd?: string;
-  /** Explicit manifest file; disables the search */
+  /** Explicit manifest file, which disables the search */
   file?: string;
 }
 

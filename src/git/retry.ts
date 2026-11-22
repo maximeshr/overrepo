@@ -16,7 +16,7 @@ const TRANSIENT_PATTERNS = [
   /kex_exchange_identification/iu,
 ];
 
-/** Network hiccups worth retrying; auth failures and missing repositories are not */
+/** Network hiccups are worth retrying, auth failures and missing repositories are not */
 const isTransientGitError = (error: unknown): boolean => {
   if (!(error instanceof GitError) || error.aborted) {
     return false;
@@ -30,9 +30,11 @@ const isTransientGitError = (error: unknown): boolean => {
 };
 
 export interface RetryOptions {
+  /** Retries after the first attempt, 0 to never retry */
   retries: number;
   /** Base delay in ms (doubled on each attempt, with jitter) */
   baseDelay?: number;
+  /** Stops retrying once aborted */
   signal?: AbortSignal;
   /** Called before each retry, e.g. to clean up a partial clone. */
   onRetry?: (error: unknown, attempt: number) => void | Promise<void>;

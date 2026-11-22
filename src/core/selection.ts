@@ -3,6 +3,7 @@ import type { Project } from "./model.ts";
 import { isWithin, normalizeRelativePath } from "./paths.ts";
 
 export interface Selection {
+  /** Select every project */
   all?: boolean;
   /** Project must have every tag (AND) */
   tags?: string[];

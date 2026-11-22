@@ -3,7 +3,7 @@ import { summarize } from "../core/runner.ts";
 import type { ProjectResult, ResultStatus } from "../core/runner.ts";
 import type { Colors, Io } from "./io.ts";
 
-// oxlint-disable-next-line no-control-regex
+// oxlint-disable-next-line no-control-regex -- ANSI escape sequences start with the ESC control character
 const ANSI = /\u001B\[[0-9;]*m/gu;
 
 const visibleLength = (text: string): number => text.replaceAll(ANSI, "").length;
@@ -11,7 +11,7 @@ const visibleLength = (text: string): number => text.replaceAll(ANSI, "").length
 const padEnd = (text: string, width: number): string =>
   text + " ".repeat(Math.max(0, width - visibleLength(text)));
 
-/** Left-aligned columns; the last column is not padded */
+/** Left-aligned columns. The last column is not padded */
 export const table = (rows: string[][], header?: string[]): string => {
   const all = header ? [header, ...rows] : rows;
   const widths: number[] = [];
@@ -125,12 +125,13 @@ export const warn = (io: Io, message: string): void => {
 };
 
 export interface ProgressBar {
-  update(done: number, total: number, label?: string): void;
+  /** Redraws the bar with the current progress and an optional label */
+  update: (done: number, total: number, label?: string) => void;
   /** Erases the bar so the next output starts on a clean line */
-  clear(): void;
+  clear: () => void;
 }
 
-/** Single-line bar redrawn in place on stderr; a no-op when stderr is not a terminal */
+/** Single-line bar redrawn in place on stderr, a no-op when stderr is not a terminal */
 export const progressBar = (io: Io, title: string, width = 24): ProgressBar => {
   if (!io.stderrIsTTY) {
     return {

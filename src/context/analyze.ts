@@ -25,8 +25,11 @@ interface Stack {
 }
 
 export interface Analysis {
+  /** Project the analysis is about */
   project: Project;
+  /** False when the project directory is not a git repository yet */
   cloned: boolean;
+  /** Languages, frameworks, tools and notes merged from every detector */
   stack: Stack;
   /** Runtime versions with the file declaring each, e.g. Node.js from `engines`, `.nvmrc`, `.node-version`. */
   runtimeVersions: VersionSpec[];
@@ -34,14 +37,19 @@ export interface Analysis {
   packageManagerVersions: VersionSpec[];
   /** Commit the analysis was read from (`origin/HEAD`), `undefined` when not cloned or missing */
   lastCommit: CommitInfo | undefined;
+  /** Commands the repository defines */
   scripts: Script[];
+  /** Packages this repository publishes */
   packages: PackageId[];
+  /** Packages this repository depends on */
   dependencies: PackageId[];
+  /** Raw strings that may contain git URLs of other repositories */
   references: string[];
   /** Top-level entries (directories end with `/`) */
   tree: string[];
   /** Repo-relative README path, when present */
   readmeFile: string | undefined;
+  /** README contents, when present */
   readme: string | undefined;
   /** Repo-relative paths of agent instruction files present in the repo */
   agentFiles: string[];

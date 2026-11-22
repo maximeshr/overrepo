@@ -5,8 +5,11 @@ export interface Project {
   path: string;
   /** Absolute path on disk */
   dir: string;
+  /** Git remote URL to clone from */
   url: string;
+  /** One-line description, `undefined` when empty */
   desc: string | undefined;
+  /** Tags used to select projects, without duplicates */
   tags: string[];
 }
 
@@ -38,8 +41,11 @@ export interface Manifest {
   manifestDir: string;
   /** Absolute path of the manifest file */
   file: string;
+  /** Defaults for the commands (concurrency, timeout, retries) */
   defaults: Defaults;
+  /** Settings of `overrepo context` */
   summary: SummaryConfig;
+  /** Projects in manifest order */
   projects: Project[];
 }
 

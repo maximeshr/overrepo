@@ -34,6 +34,7 @@ export interface ImportOptions {
   overwrite?: boolean;
   /** Remove manifest projects absent from the source */
   prune?: boolean;
+  /** Report the changes without writing the manifest */
   dryRun?: boolean;
 }
 

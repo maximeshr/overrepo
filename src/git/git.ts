@@ -5,7 +5,7 @@ import { OverrepoError } from "../core/errors.ts";
 
 export interface GitRunOptions {
   cwd?: string;
-  /** Milliseconds; the process is killed when exceeded */
+  /** Milliseconds. The process is killed when exceeded */
   timeout?: number;
   signal?: AbortSignal;
 }
@@ -156,8 +156,11 @@ export interface RepoStatus {
   branch: string | undefined;
   /** Commit hash (short) of HEAD, `undefined` on an empty repo */
   head: string | undefined;
+  /** Upstream branch, `undefined` when none is set */
   upstream: string | undefined;
+  /** Commits on HEAD that are not on the upstream */
   ahead: number;
+  /** Commits on the upstream that are not on HEAD */
   behind: number;
   /** Number of changed/untracked entries */
   changes: number;

@@ -3,12 +3,15 @@ import type { Project } from "../core/model.ts";
 import { code, linkTarget, manualBlock, tableCell } from "./markdown.ts";
 
 export interface IndexInput {
+  /** Every project of the manifest */
   projects: Project[];
   /** Index path relative to the root */
   index: string;
   /** Card path (relative to the root) of each project */
   cardOf: (project: Project) => string;
+  /** Manifest file name, quoted in the generated header */
   manifestName: string;
+  /** Hand-written block kept from the previous index */
   manual: string | undefined;
 }
 

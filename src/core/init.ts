@@ -13,6 +13,7 @@ export interface InitOptions {
   root: string;
   /** Overwrite an existing `overrepo.yaml` */
   force?: boolean;
+  /** Build the manifest without writing it */
   dryRun?: boolean;
   /** Scan depth (default 4) */
   depth?: number;

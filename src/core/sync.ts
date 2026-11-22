@@ -14,12 +14,17 @@ export interface SyncOptions {
   projects?: Project[];
   /** Fetch and fast-forward existing clones */
   pull?: boolean;
+  /** Report what would happen without touching the disk */
   dryRun?: boolean;
+  /** Projects synced in parallel, `defaults.concurrency` of the manifest by default */
   concurrency?: number;
   /** Seconds, per git operation */
   timeout?: number;
+  /** Retries of a failed network operation, `defaults.retries` of the manifest by default */
   retries?: number;
+  /** Stops the remaining projects once aborted */
   signal?: AbortSignal;
+  /** Called when a project starts and when it is done */
   onEvent?: (event: RunEvent<SyncAction>) => void;
 }
 

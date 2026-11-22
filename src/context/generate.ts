@@ -22,19 +22,22 @@ export interface ContextFile {
 }
 
 export interface ContextOptions {
-  /** Cards to (re)generate; the index always covers every project. Defaults to all. */
+  /** Cards to (re)generate, all by default. The index always covers every project. */
   projects?: Project[];
-  /** Compare instead of writing; stale files are reported with status `stale` / `orphan` */
+  /** Compare instead of writing. Stale files are reported with status `stale` or `orphan` */
   check?: boolean;
   /** Delete cards of projects no longer in the manifest */
   prune?: boolean;
+  /** Projects analyzed in parallel, `defaults.concurrency` of the manifest by default */
   concurrency?: number;
+  /** Detectors to run, `defaultDetectors` by default */
   detectors?: Detector[];
   /** Called each time a project has been analyzed */
   onProgress?: (done: number, total: number, project: Project) => void;
 }
 
 export interface ContextReport {
+  /** Every card and index file, with what happened to it */
   files: ContextFile[];
   /** True when `check` found at least one stale, missing or orphan file */
   stale: boolean;

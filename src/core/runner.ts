@@ -51,7 +51,7 @@ export interface RunOptions<T> {
 
 /**
  * Runs `task` for each project with bounded concurrency.
- * A failing project never stops the others; results keep the input order.
+ * A failing project never stops the others, and results keep the input order.
  * Once `signal` aborts, pending projects are reported as skipped ("interrupted").
  */
 export const forEachProject = async <T>(

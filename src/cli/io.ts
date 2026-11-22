@@ -3,15 +3,21 @@ import picocolors from "picocolors";
 export type Colors = ReturnType<typeof picocolors.createColors>;
 
 export interface Io {
+  /** Directory the command runs from */
   cwd: string;
-  write(text: string): void;
-  error(text: string): void;
+  /** Writes to stdout */
+  write: (text: string) => void;
+  /** Writes to stderr */
+  error: (text: string) => void;
   /** Reads all of stdin (for `import`) */
-  readStdin(): Promise<string>;
+  readStdin: () => Promise<string>;
+  /** True when stdin is a terminal, so `import` needs a file */
   stdinIsTTY: boolean;
+  /** True when stdout is a terminal, so child processes keep their colors */
   stdoutIsTTY: boolean;
   /** Progress bars are drawn on stderr only when it is a terminal */
   stderrIsTTY: boolean;
+  /** Color functions, plain text when colors are not supported */
   colors: Colors;
   /** Aborted on Ctrl+C */
   signal: AbortSignal;

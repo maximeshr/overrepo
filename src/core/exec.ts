@@ -13,6 +13,7 @@ export interface OutputLine {
 }
 
 export interface ExecValue {
+  /** Exit code of the command, `undefined` when it did not exit (timeout, abort) */
   exitCode: number | undefined;
   /** Captured output, only when `capture` is enabled */
   output?: OutputLine[];
@@ -21,10 +22,13 @@ export interface ExecValue {
 export interface ExecOptions {
   /** A single string runs through the shell; an array runs the binary directly (no quoting issues) */
   command: string | string[];
+  /** Projects to run the command in */
   projects: Project[];
+  /** Projects run in parallel, 1 by default */
   concurrency?: number;
   /** Seconds. No timeout by default: builds and installs can legitimately take long. */
   timeout?: number;
+  /** Kills the running commands and skips the rest once aborted */
   signal?: AbortSignal;
   /** `inherit` hands the terminal to the child (sequential, interactive use). Default `pipe`. */
   stdio?: "pipe" | "inherit";
@@ -32,6 +36,7 @@ export interface ExecOptions {
   capture?: boolean;
   /** Streaming callback, called line by line in `pipe` mode */
   onOutput?: (project: Project, line: OutputLine) => void;
+  /** Called when a project starts and when it is done */
   onEvent?: (event: RunEvent<ExecValue>) => void;
   /** Extra environment variables for the child */
   env?: Record<string, string>;
