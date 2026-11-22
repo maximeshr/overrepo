@@ -2,26 +2,21 @@ import { mkdir, readdir, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { clone, fetch, isDirectory, isGitRepo, pullFastForward, repoStatus } from "../git/git.ts";
 import { withRetry } from "../git/retry.ts";
-import { PARTIAL_SUFFIX, type Manifest, type Project } from "./model.ts";
-import {
-  failed,
-  forEachProject,
-  ok,
-  type Outcome,
-  type ProjectResult,
-  type RunEvent,
-} from "./runner.ts";
+import { PARTIAL_SUFFIX } from "./model.ts";
+import type { Manifest, Project } from "./model.ts";
+import { failed, forEachProject, ok } from "./runner.ts";
+import type { Outcome, ProjectResult, RunEvent } from "./runner.ts";
 
 export type SyncAction = "cloned" | "would-clone" | "present" | "pulled" | "fetched" | "would-pull";
 
 export interface SyncOptions {
-  /** Defaults to every project of the manifest. */
+  /** Defaults to every project of the manifest */
   projects?: Project[];
-  /** Fetch and fast-forward existing clones. */
+  /** Fetch and fast-forward existing clones */
   pull?: boolean;
   dryRun?: boolean;
   concurrency?: number;
-  /** Seconds, per git operation. */
+  /** Seconds, per git operation */
   timeout?: number;
   retries?: number;
   signal?: AbortSignal;
@@ -44,52 +39,110 @@ export async function sync(manifest: Manifest, options: SyncOptions = {}): Promi
   const projects = options.projects ?? manifest.projects;
   const timeout = (options.timeout ?? manifest.defaults.timeout) * 1000;
   const retries = options.retries ?? manifest.defaults.retries;
-  const signal = options.signal;
+  const { signal } = options;
 
   const cloneProject = async (project: Project): Promise<Outcome<SyncAction>> => {
-    if (options.dryRun) return ok("would clone", "would-clone");
+    if (options.dryRun) {
+      return ok("would clone", "would-clone");
+    }
+
     const partial = partialCloneDir(project);
     await mkdir(path.dirname(project.dir), { recursive: true });
     await rm(partial, { recursive: true, force: true });
+
     try {
-      await withRetry(() => clone(project.url, partial, { timeout, signal }), {
-        retries,
-        signal,
-        onRetry: () => rm(partial, { recursive: true, force: true }),
-      });
-      if (isDirectory(project.dir)) await rmdir(project.dir);
+      await withRetry(
+        async () => {
+          await clone(project.url, partial, { timeout, signal });
+        },
+        {
+          retries,
+          signal,
+          onRetry: async () => {
+            await rm(partial, { recursive: true, force: true });
+          },
+        },
+      );
+
+      if (isDirectory(project.dir)) {
+        await rmdir(project.dir);
+      }
+
       await rename(partial, project.dir);
     } catch (error) {
-      await rm(partial, { recursive: true, force: true }).catch(() => undefined);
+      await rm(partial, { recursive: true, force: true }).catch(() => {
+        /* empty */
+      });
       throw error;
     }
+
     return ok("cloned", "cloned");
   };
 
   const updateProject = async (project: Project): Promise<Outcome<SyncAction>> => {
-    if (!options.pull) return ok("present", "present");
-    if (options.dryRun) return ok("would pull", "would-pull");
+    if (!options.pull) {
+      return ok("present", "present");
+    }
+
+    if (options.dryRun) {
+      return ok("would pull", "would-pull");
+    }
+
     const status = await repoStatus(project.dir, { timeout, signal });
+
     if (!status.branch) {
-      await withRetry(() => fetch(project.dir, { timeout, signal }), { retries, signal });
+      await withRetry(
+        async () => {
+          await fetch(project.dir, { timeout, signal });
+        },
+        {
+          retries,
+          signal,
+        },
+      );
+
       return ok("fetched (detached HEAD)", "fetched");
     }
+
     if (!status.upstream) {
-      await withRetry(() => fetch(project.dir, { timeout, signal }), { retries, signal });
+      await withRetry(
+        async () => {
+          await fetch(project.dir, { timeout, signal });
+        },
+        {
+          retries,
+          signal,
+        },
+      );
+
       return ok(`fetched (${status.branch} has no upstream)`, "fetched");
     }
-    await withRetry(() => pullFastForward(project.dir, { timeout, signal }), { retries, signal });
+
+    await withRetry(
+      async () => {
+        await pullFastForward(project.dir, { timeout, signal });
+      },
+      {
+        retries,
+        signal,
+      },
+    );
+
     return ok(`pulled ${status.branch}`, "pulled");
   };
 
   const results = await forEachProject<SyncAction>(
     projects,
     async (project) => {
-      if (isGitRepo(project.dir)) return updateProject(project);
+      if (isGitRepo(project.dir)) {
+        return await updateProject(project);
+      }
+
       if (isDirectory(project.dir) && !(await isEmptyDir(project.dir))) {
         return failed("directory exists but is not a git repository");
       }
-      return cloneProject(project);
+
+      return await cloneProject(project);
     },
     {
       concurrency: options.concurrency ?? manifest.defaults.concurrency,

@@ -9,13 +9,17 @@ function issuesOf(text: string, file?: string): ManifestError["issues"] {
   try {
     parse(text, file);
   } catch (error) {
-    if (error instanceof ManifestError) return error.issues;
+    if (error instanceof ManifestError) {
+      return error.issues;
+    }
+
     throw error;
   }
+
   throw new Error("expected a ManifestError");
 }
 
-describe("parseManifest", () => {
+describe(parseManifest, () => {
   it("resolves the project key as the path", () => {
     const manifest = parse(`
 projects:
@@ -26,6 +30,7 @@ projects:
   frontend/web:
     url: git@github.com:client/web.git
 `);
+
     expect(manifest.root).toBe(path.resolve("/meta"));
     expect(manifest.manifestDir).toBe(path.resolve("/meta"));
     expect(manifest.summary).toMatchObject({ outDir: "context", index: "context/index.md" });
@@ -59,6 +64,7 @@ projects:
 `,
       "/meta/workspace/overrepo.yaml",
     );
+
     expect(manifest.root).toBe(path.resolve("/meta"));
     expect(manifest.manifestDir).toBe(path.resolve("/meta/workspace"));
     expect(manifest.projects[0]).toMatchObject({
@@ -72,10 +78,11 @@ projects:
   it("rejects projects that collide with summary.outDir", () => {
     const message =
       'path collides with summary.outDir ("context"); set summary.outDir to another directory';
-    expect(issuesOf("projects:\n  context:\n    url: x\n")).toEqual([
+
+    expect(issuesOf("projects:\n  context:\n    url: x\n")).toStrictEqual([
       expect.objectContaining({ path: "projects.context", message }),
     ]);
-    expect(issuesOf("projects:\n  Context/api:\n    url: x\n")).toEqual([
+    expect(issuesOf("projects:\n  Context/api:\n    url: x\n")).toStrictEqual([
       expect.objectContaining({ path: "projects.Context/api", message }),
     ]);
     expect(() =>
@@ -85,7 +92,7 @@ projects:
 
   it("reports unknown keys with their YAML path and line", () => {
     const issues = issuesOf("projects:\n  api:\n    url: x\n    path: api\n");
-    expect(issues).toEqual([
+    expect(issues).toStrictEqual([
       expect.objectContaining({
         path: "projects.api.path",
         line: 4,

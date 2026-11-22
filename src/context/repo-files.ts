@@ -1,13 +1,17 @@
 import { gitPathExists, readGitFile, trackedTopLevel } from "../git/git.ts";
 import type { RepoFiles } from "./types.ts";
 
-/** Files larger than this are never read by detectors. */
+/** Files larger than this are never read by detectors */
 const MAX_FILE_BYTES = 1024 * 1024;
 
 function compareEntries(a: string, b: string): number {
   const aDir = a.endsWith("/");
   const bDir = b.endsWith("/");
-  if (aDir !== bDir) return aDir ? -1 : 1;
+
+  if (aDir !== bDir) {
+    return aDir ? -1 : 1;
+  }
+
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
@@ -22,26 +26,32 @@ export async function openRepoFiles(dir: string, ref: string): Promise<RepoFiles
 
   const texts = new Map<string, Promise<string | undefined>>();
 
-  const readText = (file: string): Promise<string | undefined> => {
+  const readText = async (file: string): Promise<string | undefined> => {
     let cached = texts.get(file);
+
     if (!cached) {
       cached = readGitFile(dir, ref, file, MAX_FILE_BYTES);
       texts.set(file, cached);
     }
-    return cached;
+
+    return await cached;
   };
 
   return {
     topLevel,
-    exists: (file) => gitPathExists(dir, ref, file),
+    exists: async (file) => await gitPathExists(dir, ref, file),
     readText,
     async readJson<T>(file: string) {
       const text = await readText(file);
-      if (text === undefined) return undefined;
+
+      if (text === undefined) {
+        return;
+      }
+
       try {
         return JSON.parse(text) as T;
       } catch {
-        return undefined;
+        return;
       }
     },
   };

@@ -16,16 +16,22 @@ const TRANSIENT_PATTERNS = [
   /kex_exchange_identification/i,
 ];
 
-/** Network hiccups worth retrying; auth failures and missing repositories are not. */
+/** Network hiccups worth retrying; auth failures and missing repositories are not */
 function isTransientGitError(error: unknown): boolean {
-  if (!(error instanceof GitError) || error.aborted) return false;
-  if (error.timedOut) return true;
+  if (!(error instanceof GitError) || error.aborted) {
+    return false;
+  }
+
+  if (error.timedOut) {
+    return true;
+  }
+
   return TRANSIENT_PATTERNS.some((pattern) => pattern.test(error.stderr));
 }
 
 export interface RetryOptions {
   retries: number;
-  /** Base delay in ms (doubled on each attempt, with jitter). */
+  /** Base delay in ms (doubled on each attempt, with jitter) */
   baseDelay?: number;
   signal?: AbortSignal;
   /** Called before each retry, e.g. to clean up a partial clone. */
@@ -34,16 +40,24 @@ export interface RetryOptions {
 
 export async function withRetry<T>(operation: () => Promise<T>, options: RetryOptions): Promise<T> {
   const baseDelay = options.baseDelay ?? 1000;
-  for (let attempt = 0; ; attempt++) {
+
+  for (let attempt = 0; ; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
-      if (attempt >= options.retries || !isTransientGitError(error) || options.signal?.aborted)
+      if (attempt >= options.retries || !isTransientGitError(error) || options.signal?.aborted) {
         throw error;
+      }
+
       await options.onRetry?.(error, attempt + 1);
       const wait = baseDelay * 2 ** attempt * (0.75 + Math.random() * 0.5);
-      await delay(wait, undefined, { signal: options.signal }).catch(() => undefined);
-      if (options.signal?.aborted) throw error;
+      await delay(wait, undefined, { signal: options.signal }).catch(() => {
+        /* empty */
+      });
+
+      if (options.signal?.aborted) {
+        throw error;
+      }
     }
   }
 }

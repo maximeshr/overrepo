@@ -6,16 +6,16 @@ import { code, linkTarget, manualBlock, readmeExcerpt, truncate } from "./markdo
 
 export interface DependencyLink {
   name: string;
-  /** Card path of the other project, relative to the root. */
+  /** Card path of the other project, relative to the root */
   card: string;
   via: string;
 }
 
 export interface CardInput {
   analysis: Analysis;
-  /** Card path relative to the manifest directory. */
+  /** Card path relative to the manifest directory */
   card: string;
-  /** Clone path relative to the manifest directory. */
+  /** Clone path relative to the manifest directory */
   checkout: string;
   uses: DependencyLink[];
   usedBy: DependencyLink[];
@@ -34,10 +34,15 @@ const MAX_SCRIPT_COMMAND = 120;
 
 function frontmatter(data: Record<string, unknown>): string {
   const doc = new Document(data);
+
   for (const key of Object.keys(data)) {
     const node = doc.get(key, true);
-    if (isSeq(node)) node.flow = true;
+
+    if (isSeq(node)) {
+      node.flow = true;
+    }
   }
+
   return `---\n${doc.toString({ lineWidth: 0 })}---`;
 }
 
@@ -47,23 +52,34 @@ function relativeLink(fromFile: string, toRootRelative: string): string {
 
 function list(items: string[], limit: number, noun: string): string[] {
   const lines = items.slice(0, limit);
-  if (items.length > limit) lines.push(`- … ${items.length - limit} more ${noun}`);
+
+  if (items.length > limit) {
+    lines.push(`- … ${items.length - limit} more ${noun}`);
+  }
+
   return lines;
 }
 
-/** `pnpm 10.4.1` when a version is declared, `pnpm (version not declared)` when only a lockfile names it. */
+/** `pnpm 10.4.1` when a version is declared, `pnpm (version not declared)` when only a lockfile names it */
 function packageManagerLabel(analysis: Analysis, name: string): string {
   const specs = analysis.packageManagerVersions.filter((spec) => spec.name === name);
-  if (specs.length === 0) return name;
+
+  if (specs.length === 0) {
+    return name;
+  }
+
   const version = specs.find((spec) => spec.version)?.version;
+
   return version ? `${name} ${version}` : `${name} (version not declared)`;
 }
 
 function render(input: CardInput, limits: Limits): string {
   const { analysis, card } = input;
   const { project, stack } = analysis;
+
   const repoLink = (file = "") =>
     relativeLink(card, file ? `${input.checkout}/${file}` : input.checkout) + (file ? "" : "/");
+
   const out: string[] = [];
 
   out.push(
@@ -81,15 +97,27 @@ function render(input: CardInput, limits: Limits): string {
     `# ${project.name}`,
     "",
   );
-  if (project.desc) out.push(project.desc, "");
+
+  if (project.desc) {
+    out.push(project.desc, "");
+  }
 
   const facts = [`- **Path:** [${code(`${project.path}/`)}](${repoLink()})`];
-  if (project.url) facts.push(`- **Repository:** ${code(project.url)}`);
-  if (project.tags.length > 0) facts.push(`- **Tags:** ${project.tags.join(", ")}`);
-  if (analysis.lastCommit)
+
+  if (project.url) {
+    facts.push(`- **Repository:** ${code(project.url)}`);
+  }
+
+  if (project.tags.length > 0) {
+    facts.push(`- **Tags:** ${project.tags.join(", ")}`);
+  }
+
+  if (analysis.lastCommit) {
     facts.push(
       `- **Last commit:** ${analysis.lastCommit.date.slice(0, 10)} (${code(analysis.lastCommit.shortSha)} on ${code("origin/HEAD")})`,
     );
+  }
+
   out.push(...facts, "");
 
   if (!analysis.cloned) {
@@ -125,31 +153,41 @@ function render(input: CardInput, limits: Limits): string {
   )
     .filter(([, values]) => values.length > 0)
     .map(([label, values]) => `- **${label}:** ${values.join(", ")}`);
-  if (stackLines.length > 0) out.push("## Stack", "", ...stackLines, "");
+
+  if (stackLines.length > 0) {
+    out.push("## Stack", "", ...stackLines, "");
+  }
 
   if (analysis.scripts.length > 0 && limits.scripts > 0) {
     const scripts = analysis.scripts.map((script) => {
       const invocation = code(`${script.runner} ${script.name}`);
+
       return script.cmd
         ? `- ${invocation} — ${code(truncate(script.cmd, MAX_SCRIPT_COMMAND))}`
         : `- ${invocation}`;
     });
+
     out.push("## Scripts", "", ...list(scripts, limits.scripts, "scripts"), "");
   }
 
   if ((input.uses.length > 0 || input.usedBy.length > 0) && limits.dependencies > 0) {
     out.push("## Internal dependencies", "");
+
     const line = (link: DependencyLink) =>
       `- [${link.name}](${relativeLink(card, link.card)}) — ${link.via}`;
-    if (input.uses.length > 0)
+
+    if (input.uses.length > 0) {
       out.push("Uses:", "", ...list(input.uses.map(line), limits.dependencies, "projects"), "");
-    if (input.usedBy.length > 0)
+    }
+
+    if (input.usedBy.length > 0) {
       out.push(
         "Used by:",
         "",
         ...list(input.usedBy.map(line), limits.dependencies, "projects"),
         "",
       );
+    }
   }
 
   if (analysis.keyFiles.length > 0) {
@@ -163,20 +201,26 @@ function render(input: CardInput, limits: Limits): string {
 
   if (analysis.tree.length > 0 && limits.treeEntries > 0) {
     const shown = analysis.tree.slice(0, limits.treeEntries);
-    if (analysis.tree.length > shown.length)
+
+    if (analysis.tree.length > shown.length) {
       shown.push(`… ${analysis.tree.length - shown.length} more entries`);
+    }
+
     out.push("## Structure", "", "```text", ...shown, "```", "");
   }
 
   if (analysis.readme && analysis.readmeFile && limits.readmeChars > 0) {
     const excerpt = readmeExcerpt(analysis.readme, limits.readmeChars);
+
     if (excerpt.text) {
       out.push(`## README (excerpt)`, "", excerpt.text, "");
-      if (excerpt.truncated)
+
+      if (excerpt.truncated) {
         out.push(
           `_… truncated, see [${analysis.readmeFile}](${repoLink(analysis.readmeFile)})._`,
           "",
         );
+      }
     }
   }
 
@@ -185,35 +229,42 @@ function render(input: CardInput, limits: Limits): string {
 
 /**
  * Renders a card whose generated part stays under `config.maxBytes`, shrinking the
- * least essential sections first (README, then tree, scripts, dependencies).
+ * least essential sections first (README, then tree, scripts, dependencies)
  */
 export function renderCard(input: CardInput): string {
   const { config } = input;
+
   const limits: Limits = {
     readmeChars: config.readmeMaxChars,
     treeEntries: config.treeMaxEntries,
     scripts: 60,
     dependencies: 50,
   };
+
   let body = render(input, limits);
   const size = () => Buffer.byteLength(body);
 
   while (size() > config.maxBytes) {
     const overflow = size() - config.maxBytes;
-    if (limits.readmeChars > 0)
+
+    if (limits.readmeChars > 0) {
       limits.readmeChars =
         limits.readmeChars > overflow + 200 ? limits.readmeChars - overflow - 200 : 0;
-    else if (limits.treeEntries > 10)
+    } else if (limits.treeEntries > 10) {
       limits.treeEntries = Math.max(10, Math.floor(limits.treeEntries / 2));
-    else if (limits.scripts > 10) limits.scripts = Math.max(10, Math.floor(limits.scripts / 2));
-    else if (limits.dependencies > 10)
+    } else if (limits.scripts > 10) {
+      limits.scripts = Math.max(10, Math.floor(limits.scripts / 2));
+    } else if (limits.dependencies > 10) {
       limits.dependencies = Math.max(10, Math.floor(limits.dependencies / 2));
-    else break;
+    } else {
+      break;
+    }
+
     body = render(input, limits);
   }
 
   if (size() > config.maxBytes) {
-    const cut = Buffer.from(body).subarray(0, config.maxBytes).toString("utf8").replace(/�$/, "");
+    const cut = Buffer.from(body).subarray(0, config.maxBytes).toString("utf-8").replace(/�$/, "");
     body = `${cut.slice(0, cut.lastIndexOf("\n"))}\n\n_… card truncated to ${config.maxBytes} bytes._\n`;
   }
 

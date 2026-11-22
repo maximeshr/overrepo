@@ -29,8 +29,13 @@ export const pythonDetector: Detector = {
   id: "python",
   async detect(files) {
     const candidates = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"];
-    if (!candidates.some((file) => files.topLevel.includes(file))) return undefined;
+
+    if (!candidates.some((file) => files.topLevel.includes(file))) {
+      return;
+    }
+
     const pyproject = (await files.readText("pyproject.toml")) ?? "";
+
     const corpus = [
       pyproject,
       (await files.readText("requirements.txt")) ?? "",
@@ -39,11 +44,15 @@ export const pythonDetector: Detector = {
     ]
       .join("\n")
       .toLowerCase();
+
     const mentions = (name: string) =>
       new RegExp(`(^|[^a-z0-9_-])${name}([^a-z0-9_-]|$)`, "m").test(corpus);
 
     let manager = MANAGERS.find(([file]) => files.topLevel.includes(file))?.[1];
-    if (!manager && /\[tool\.poetry\]/.test(pyproject)) manager = "poetry";
+
+    if (!manager && pyproject.includes("[tool.poetry]")) {
+      manager = "poetry";
+    }
 
     const detection: Detection = {
       languages: ["Python"],
@@ -51,10 +60,19 @@ export const pythonDetector: Detector = {
       packageManagers: [manager ?? "pip"],
       tools: known(mentions, TOOLS),
     };
+
     const name = /^name\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
-    if (name) detection.packages = [{ ecosystem: "pypi", name: name.toLowerCase() }];
+
+    if (name) {
+      detection.packages = [{ ecosystem: "pypi", name: name.toLowerCase() }];
+    }
+
     const requires = /^requires-python\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
-    if (requires) detection.runtimes = [`Python ${requires}`];
+
+    if (requires) {
+      detection.runtimes = [`Python ${requires}`];
+    }
+
     return detection;
   },
 };

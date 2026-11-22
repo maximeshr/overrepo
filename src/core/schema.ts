@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const text = z.string().trim().min(1, "must not be empty");
 
-/** Project paths and tags are used in comma-separated CLI flags, so commas and whitespace are banned. */
+/** Project paths and tags are used in comma-separated CLI flags, so commas and whitespace are banned */
 const identifier = z
   .string()
   .min(1, "must not be empty")

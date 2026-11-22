@@ -7,7 +7,7 @@ import { nodeDetector } from "./node.ts";
 import { phpDetector } from "./php.ts";
 import { pythonDetector } from "./python.ts";
 
-/** Order matters: it drives the order of languages, frameworks and scripts in cards. */
+/** Order matters: it drives the order of languages, frameworks and scripts in cards */
 export const defaultDetectors: Detector[] = [
   nodeDetector,
   phpDetector,

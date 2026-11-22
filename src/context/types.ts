@@ -2,7 +2,7 @@ export interface Script {
   /** How to invoke it, e.g. `pnpm run`, `composer run`, `make`. */
   runner: string;
   name: string;
-  /** Underlying command, when known. */
+  /** Underlying command, when known */
   cmd?: string;
 }
 
@@ -20,7 +20,7 @@ export interface PackageId {
 export interface VersionSpec {
   name: string;
   version: string | undefined;
-  /** Where it was read: a file (`.nvmrc`), a JSON field (`package.json#engines.node`), or `default`. */
+  /** Where it was read: a file (`.nvmrc`), a JSON field (`package.json#engines.node`), or `default` */
   source: string;
 }
 
@@ -30,25 +30,25 @@ export interface Detection {
   packageManagers?: string[];
   /** Runtime constraints, e.g. `Node >=20`, `PHP ^8.2`. */
   runtimes?: string[];
-  /** Structured runtime versions, one entry per declaring source. */
+  /** Structured runtime versions, one entry per declaring source */
   runtimeVersions?: VersionSpec[];
-  /** Structured package manager versions, one entry per declaring source. */
+  /** Structured package manager versions, one entry per declaring source */
   packageManagerVersions?: VersionSpec[];
-  /** Tooling worth knowing: test runners, containers, CI. */
+  /** Tooling worth knowing: test runners, containers, CI */
   tools?: string[];
   scripts?: Script[];
-  /** Packages this repository publishes / declares. */
+  /** Packages this repository publishes / declares */
   packages?: PackageId[];
-  /** Packages this repository depends on. */
+  /** Packages this repository depends on */
   dependencies?: PackageId[];
-  /** Raw strings that may contain git URLs of other repositories (dependency specs, VCS repositories…). */
+  /** Raw strings that may contain git URLs of other repositories (dependency specs, VCS repositories…) */
   references?: string[];
   notes?: string[];
 }
 
 /** Read-only access to a repository working tree. Paths are POSIX and relative to the repo root. */
 export interface RepoFiles {
-  /** Top-level entry names (directories end with `/`). */
+  /** Top-level entry names (directories end with `/`) */
   readonly topLevel: string[];
   exists(file: string): Promise<boolean>;
   readText(file: string): Promise<string | undefined>;

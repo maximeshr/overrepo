@@ -1,5 +1,6 @@
 import { isGitRepo } from "../../git/git.ts";
-import { contextOf, load, select, withSelection, type SelectionOptions } from "../options.ts";
+import { contextOf, load, select, withSelection } from "../options.ts";
+import type { SelectionOptions } from "../options.ts";
 import { json, table } from "../output.ts";
 import type { Register } from "./types.ts";
 
@@ -15,6 +16,7 @@ export const registerList: Register = (program, run, io) => {
     run(async (options: SelectionOptions & { json?: boolean; names?: boolean }, command) => {
       const manifest = await load(contextOf(io, command));
       const projects = select(manifest, options);
+
       if (options.json) {
         json(
           io,
@@ -26,19 +28,25 @@ export const registerList: Register = (program, run, io) => {
             cloned: isGitRepo(project.dir),
           })),
         );
+
         return 0;
       }
+
       if (options.names) {
         io.write(projects.map((project) => `${project.name}\n`).join(""));
+
         return 0;
       }
+
       const { colors } = io;
+
       const rows = projects.map((project) => [
         isGitRepo(project.dir) ? colors.green("●") : colors.dim("○"),
         colors.bold(project.path),
         colors.cyan(project.tags.join(",")),
         colors.dim(project.desc ?? ""),
       ]);
+
       io.write(
         table(
           rows,
@@ -46,6 +54,7 @@ export const registerList: Register = (program, run, io) => {
         ),
       );
       io.error(colors.dim(`${projects.length} project(s), ● cloned ○ not cloned\n`));
+
       return 0;
     }),
   );

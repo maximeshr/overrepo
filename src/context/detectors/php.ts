@@ -31,16 +31,20 @@ export const phpDetector: Detector = {
   id: "php",
   async detect(files) {
     const composer = await files.readJson<Record<string, unknown>>("composer.json");
+
     if (!isRecord(composer)) {
       return files.topLevel.includes("index.php") ? { languages: ["PHP"] } : undefined;
     }
+
     const require = stringRecord(composer.require);
     const deps = { ...stringRecord(composer["require-dev"]), ...require };
     const has = (name: string) => name in deps;
 
     const frameworks = known(has, FRAMEWORKS);
-    if (files.topLevel.includes("artisan") && !frameworks.includes("Laravel"))
+
+    if (files.topLevel.includes("artisan") && !frameworks.includes("Laravel")) {
       frameworks.unshift("Laravel");
+    }
 
     const repositories = Array.isArray(composer.repositories)
       ? composer.repositories
@@ -57,6 +61,7 @@ export const phpDetector: Detector = {
         .filter((name) => !/^(pre|post)-/.test(name))
         .map((name) => {
           const value = (composer.scripts as Record<string, unknown>)[name];
+
           return {
             runner: "composer run",
             name,
@@ -74,7 +79,11 @@ export const phpDetector: Detector = {
           ? [{ ecosystem: "composer", name: composer.name }]
           : [],
     };
-    if (require.php) detection.runtimes = [`PHP ${require.php}`];
+
+    if (require.php) {
+      detection.runtimes = [`PHP ${require.php}`];
+    }
+
     return detection;
   },
 };

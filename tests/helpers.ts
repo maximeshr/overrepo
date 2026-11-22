@@ -11,31 +11,40 @@ const isolatedGitConfig = path.join(
   mkdtempSync(path.join(tmpdir(), "overrepo-gitconfig-")),
   "gitconfig",
 );
+
 writeFileSync(
   isolatedGitConfig,
   '[user]\n\tname = overrepo tests\n\temail = tests@overrepo.invalid\n[init]\n\tdefaultBranch = main\n[commit]\n\tgpgsign = false\n[protocol "file"]\n\tallow = always\n',
 );
+
 process.env.GIT_CONFIG_GLOBAL = isolatedGitConfig;
+
 process.env.GIT_CONFIG_NOSYSTEM = "1";
+
 // Git hooks export these (e.g. GIT_DIR in a worktree's pre-push); they would redirect every test repository.
-for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"])
+for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"]) {
   delete process.env[name];
+}
 
 const tempDirs: string[] = [];
+
 afterAll(() => {
-  for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+  for (const dir of tempDirs) {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 export function tempDir(prefix = "overrepo-"): string {
   const dir = mkdtempSync(path.join(tmpdir(), prefix));
   tempDirs.push(dir);
+
   return dir;
 }
 
 export function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, {
     cwd,
-    encoding: "utf8",
+    encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
 }
@@ -48,7 +57,7 @@ function writeFiles(dir: string, files: Record<string, string>): void {
   }
 }
 
-/** Creates a repository with one commit and returns its `file://` URL. */
+/** Creates a repository with one commit and returns its `file://` URL */
 export function createRemote(
   base: string,
   name: string,
@@ -60,6 +69,7 @@ export function createRemote(
   writeFiles(dir, files);
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "initial");
+
   return `file://${dir}`;
 }
 
@@ -72,10 +82,15 @@ export interface TestRun {
 export async function cli(cwd: string, args: string[], stdin = ""): Promise<TestRun> {
   const out: string[] = [];
   const err: string[] = [];
+
   const io: Io = {
     cwd,
-    write: (text) => void out.push(text),
-    error: (text) => void err.push(text),
+    write: (text) => {
+      out.push(text);
+    },
+    error: (text) => {
+      err.push(text);
+    },
     readStdin: async () => stdin,
     stdinIsTTY: false,
     stdoutIsTTY: false,
@@ -83,6 +98,8 @@ export async function cli(cwd: string, args: string[], stdin = ""): Promise<Test
     colors: picocolors.createColors(false),
     signal: new AbortController().signal,
   };
+
   const code = await runCli(args, io);
+
   return { code, stdout: out.join(""), stderr: err.join("") };
 }

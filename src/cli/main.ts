@@ -11,9 +11,10 @@ import { registerStatus } from "./commands/status.ts";
 import { registerSync } from "./commands/sync.ts";
 import type { Io } from "./io.ts";
 
-/** Exit codes: 0 success, 1 at least one project failed, 2 usage or configuration error, 130 interrupted. */
+/** Exit codes: 0 success, 1 at least one project failed, 2 usage or configuration error, 130 interrupted */
 export async function runCli(argv: string[], io: Io): Promise<number> {
   let exitCode = 0;
+
   const run =
     (action: (...args: any[]) => Promise<number>) =>
     async (...args: any[]): Promise<void> => {
@@ -29,9 +30,15 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
     .showHelpAfterError("(run with --help for usage)")
     .exitOverride()
     .configureOutput({
-      writeOut: (text) => io.write(text),
-      writeErr: (text) => io.error(text),
-      outputError: (text, write) => write(io.colors.red(text)),
+      writeOut: (text) => {
+        io.write(text);
+      },
+      writeErr: (text) => {
+        io.error(text);
+      },
+      outputError: (text, write) => {
+        write(io.colors.red(text));
+      },
     });
 
   for (const register of [
@@ -46,7 +53,10 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
   ]) {
     register(program, run, io);
   }
-  for (const command of program.commands) command.exitOverride();
+
+  for (const command of program.commands) {
+    command.exitOverride();
+  }
 
   try {
     await program.parseAsync(argv, { from: "user" });
@@ -56,30 +66,41 @@ export async function runCli(argv: string[], io: Io): Promise<number> {
         error.code === "commander.helpDisplayed" ||
         error.code === "commander.version" ||
         error.code === "commander.help"
-      )
+      ) {
         return 0;
+      }
+
       return 2;
     }
+
     if (io.signal.aborted) {
       io.error(io.colors.yellow("interrupted\n"));
+
       return 130;
     }
+
     if (error instanceof OverrepoError) {
       io.error(`${io.colors.red("error")} ${error.message}\n`);
+
       return error.exitCode;
     }
+
     io.error(
       `${io.colors.red("unexpected error")} ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
     );
+
     return 1;
   }
+
   if (io.signal.aborted) {
     io.error(
       io.colors.yellow(
         "interrupted: partial clones were cleaned up; run `overrepo doctor` if in doubt\n",
       ),
     );
+
     return 130;
   }
+
   return exitCode;
 }

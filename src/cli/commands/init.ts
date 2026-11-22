@@ -14,21 +14,29 @@ export const registerInit: Register = (program, run, io) => {
     .action(
       run(async (options: { depth: number; force?: boolean; dryRun?: boolean }, command) => {
         const { cwd } = contextOf(io, command);
+
         const result = await init({
           root: cwd,
           depth: options.depth,
           force: options.force,
           dryRun: options.dryRun,
         });
-        for (const warning of result.warnings) warn(io, warning);
+
+        for (const warning of result.warnings) {
+          warn(io, warning);
+        }
+
         if (options.dryRun) {
           io.write(result.text);
+
           return 0;
         }
+
         io.error(
           `${io.colors.green("✔")} wrote ${path.relative(cwd, result.file) || result.file} with ${result.projectCount} project(s)\n`,
         );
         io.error(io.colors.dim("next: review it, then run `overrepo sync`\n"));
+
         return 0;
       }),
     );

@@ -6,14 +6,14 @@ export interface Io {
   cwd: string;
   write(text: string): void;
   error(text: string): void;
-  /** Reads all of stdin (for `import`). */
+  /** Reads all of stdin (for `import`) */
   readStdin(): Promise<string>;
   stdinIsTTY: boolean;
   stdoutIsTTY: boolean;
-  /** Progress bars are drawn on stderr only when it is a terminal. */
+  /** Progress bars are drawn on stderr only when it is a terminal */
   stderrIsTTY: boolean;
   colors: Colors;
-  /** Aborted on Ctrl+C. */
+  /** Aborted on Ctrl+C */
   signal: AbortSignal;
 }
 
@@ -24,13 +24,16 @@ export function processIo(signal: AbortSignal): Io {
     error: (text) => process.stderr.write(text),
     readStdin: async () => {
       const chunks: Buffer[] = [];
-      for await (const chunk of process.stdin)
+
+      for await (const chunk of process.stdin) {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
-      return Buffer.concat(chunks).toString("utf8");
+      }
+
+      return Buffer.concat(chunks).toString("utf-8");
     },
-    stdinIsTTY: Boolean(process.stdin.isTTY),
-    stdoutIsTTY: Boolean(process.stdout.isTTY),
-    stderrIsTTY: Boolean(process.stderr.isTTY),
+    stdinIsTTY:  process.stdin.isTTY,
+    stdoutIsTTY:  process.stdout.isTTY,
+    stderrIsTTY:  process.stderr.isTTY,
     colors: picocolors.createColors(picocolors.isColorSupported),
     signal,
   };

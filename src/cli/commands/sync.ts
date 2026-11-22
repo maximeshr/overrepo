@@ -7,8 +7,8 @@ import {
   positiveNumber,
   select,
   withSelection,
-  type SelectionOptions,
 } from "../options.ts";
+import type { SelectionOptions } from "../options.ts";
 import { json, printSummary, resultLine } from "../output.ts";
 import type { Register } from "./types.ts";
 
@@ -40,6 +40,7 @@ export const registerSync: Register = (program, run, io) => {
       const manifest = await load(context);
       const projects = select(manifest, options);
       const width = Math.min(28, Math.max(0, ...projects.map((project) => project.name.length)));
+
       const report = await sync(manifest, {
         projects,
         pull: options.pull,
@@ -49,8 +50,14 @@ export const registerSync: Register = (program, run, io) => {
         retries: options.retries,
         signal: io.signal,
         onEvent: (event) => {
-          if (options.json || event.type !== "done") return;
-          if (options.quiet && event.result.status !== "failed") return;
+          if (options.json || event.type !== "done") {
+            return;
+          }
+
+          if (options.quiet && event.result.status !== "failed") {
+            return;
+          }
+
           io.error(`${resultLine(io.colors, event.result, width)}\n`);
         },
       });
@@ -66,6 +73,7 @@ export const registerSync: Register = (program, run, io) => {
             error: result.error ?? null,
           })),
         });
+
         return report.results.some((result) => result.status === "failed") ? 1 : 0;
       }
 

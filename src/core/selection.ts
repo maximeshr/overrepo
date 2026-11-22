@@ -4,16 +4,16 @@ import { isWithin, normalizeRelativePath } from "./paths.ts";
 
 export interface Selection {
   all?: boolean;
-  /** Project must have every tag (AND). */
+  /** Project must have every tag (AND) */
   tags?: string[];
-  /** Project path must be under one of these prefixes. */
+  /** Project path must be under one of these prefixes */
   paths?: string[];
-  /** Explicit project paths (the manifest keys). */
+  /** Explicit project paths (the manifest keys) */
   projects?: string[];
 }
 
 export interface SelectOptions {
-  /** Throw a `UsageError` when no explicit selector (`all`, `tags`, `paths`, `projects`) is given. */
+  /** Throw a `UsageError` when no explicit selector (`all`, `tags`, `paths`, `projects`) is given */
   requireExplicit?: boolean;
 }
 
@@ -37,28 +37,45 @@ export function selectProjects(
   }
 
   const names = nonEmpty(selection.projects) ? new Set(selection.projects) : undefined;
+
   if (names) {
     const known = new Set(projects.map((project) => project.name));
     const unknown = [...names].filter((name) => !known.has(name));
-    if (unknown.length > 0)
+
+    if (unknown.length > 0) {
       throw new UsageError(
         `unknown project${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}`,
       );
+    }
   }
 
   const prefixes = nonEmpty(selection.paths)
     ? selection.paths.map((prefix) => {
         const normalized = normalizeRelativePath(prefix);
-        if ("error" in normalized) throw new UsageError(`--paths: ${normalized.error}`);
+
+        if ("error" in normalized) {
+          throw new UsageError(`--paths: ${normalized.error}`);
+        }
+
         return normalized.path;
       })
     : undefined;
 
   return projects.filter((project) => {
     const tags = new Set(project.tags);
-    if (names && !names.has(project.name)) return false;
-    if (nonEmpty(selection.tags) && !selection.tags.every((tag) => tags.has(tag))) return false;
-    if (prefixes && !prefixes.some((prefix) => isWithin(project.path, prefix))) return false;
+
+    if (names && !names.has(project.name)) {
+      return false;
+    }
+
+    if (nonEmpty(selection.tags) && !selection.tags.every((tag) => tags.has(tag))) {
+      return false;
+    }
+
+    if (prefixes && !prefixes.some((prefix) => isWithin(project.path, prefix))) {
+      return false;
+    }
+
     return true;
   });
 }

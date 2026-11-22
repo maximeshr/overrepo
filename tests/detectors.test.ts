@@ -6,18 +6,20 @@ import {
 } from "../src/context/detectors/node.ts";
 import type { RepoFiles } from "../src/context/types.ts";
 
-/** In-memory repository: keys are root-relative paths, values their contents. */
+/** In-memory repository: keys are root-relative paths, values their contents */
 function memoryFiles(entries: Record<string, string>): RepoFiles {
   const readText = async (file: string) => entries[file];
+
   return {
     topLevel: Object.keys(entries)
       .map((file) => (file.includes("/") ? `${file.split("/")[0]}/` : file))
       .filter((file, index, all) => all.indexOf(file) === index)
-      .sort(),
+      .toSorted(),
     exists: async (file) => file in entries,
     readText,
     async readJson<T>(file: string) {
       const text = await readText(file);
+
       return text === undefined ? undefined : (JSON.parse(text) as T);
     },
   };
@@ -25,7 +27,7 @@ function memoryFiles(entries: Record<string, string>): RepoFiles {
 
 const pkg = (fields: Record<string, unknown>) => JSON.stringify({ name: "app", ...fields });
 
-describe("parsePackageManagerField", () => {
+describe(parsePackageManagerField, () => {
   it.each([
     [
       "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679",
@@ -36,7 +38,7 @@ describe("parsePackageManagerField", () => {
     ["npm@11.0.0-pre.1", "npm", "11.0.0-pre.1"],
     ["pnpm", "pnpm", undefined],
   ])("%s", (value, name, version) => {
-    expect(parsePackageManagerField(value)).toEqual({ name, version });
+    expect(parsePackageManagerField(value)).toStrictEqual({ name, version });
   });
 
   it("rejects values that are not a package manager spec", () => {
@@ -45,7 +47,7 @@ describe("parsePackageManagerField", () => {
   });
 });
 
-describe("versionFileValue", () => {
+describe(versionFileValue, () => {
   it("keeps the first meaningful line as written", () => {
     expect(versionFileValue("v20.11.0\n")).toBe("v20.11.0");
     expect(versionFileValue("# pinned for CI\n\n  lts/iron  \n22\n")).toBe("lts/iron");
@@ -53,7 +55,7 @@ describe("versionFileValue", () => {
   });
 });
 
-describe("nodeDetector", () => {
+describe(nodeDetector, () => {
   it("reads engines, devEngines, .nvmrc and .node-version with their source", async () => {
     const detection = await nodeDetector.detect(
       memoryFiles({
@@ -65,13 +67,14 @@ describe("nodeDetector", () => {
         ".node-version": "20.11\n",
       }),
     );
-    expect(detection?.runtimeVersions).toEqual([
+
+    expect(detection?.runtimeVersions).toStrictEqual([
       { name: "node", version: ">=20", source: "package.json#engines.node" },
       { name: "node", version: "22.12.0", source: "package.json#devEngines.runtime" },
       { name: "node", version: "v20.11.0", source: ".nvmrc" },
       { name: "node", version: "20.11", source: ".node-version" },
     ]);
-    expect(detection?.runtimes).toEqual([
+    expect(detection?.runtimes).toStrictEqual([
       "Node >=20",
       "Node 22.12.0 (devEngines)",
       "Node v20.11.0 (.nvmrc)",
@@ -83,17 +86,21 @@ describe("nodeDetector", () => {
     const detection = await nodeDetector.detect(
       memoryFiles({ ".nvmrc": "18\n", "composer.json": "{}" }),
     );
-    expect(detection).toEqual({
+
+    expect(detection).toStrictEqual({
       runtimes: ["Node 18 (.nvmrc)"],
       runtimeVersions: [{ name: "node", version: "18", source: ".nvmrc" }],
     });
-    expect(await nodeDetector.detect(memoryFiles({ "composer.json": "{}" }))).toBeUndefined();
+    await expect(
+      nodeDetector.detect(memoryFiles({ "composer.json": "{}" })),
+    ).resolves.toBeUndefined();
   });
 
   it("ignores version files outside the root and empty ones", async () => {
     const detection = await nodeDetector.detect(
       memoryFiles({ "package.json": pkg({}), ".nvmrc": "\n", "web/.nvmrc": "20\n" }),
     );
+
     expect(detection?.runtimeVersions).toBeUndefined();
     expect(detection?.runtimes).toBeUndefined();
   });
@@ -108,8 +115,9 @@ describe("nodeDetector", () => {
         "pnpm-lock.yaml": "",
       }),
     );
-    expect(detection?.packageManagers).toEqual(["pnpm"]);
-    expect(detection?.packageManagerVersions).toEqual([
+
+    expect(detection?.packageManagers).toStrictEqual(["pnpm"]);
+    expect(detection?.packageManagerVersions).toStrictEqual([
       { name: "pnpm", version: "10.4.1", source: "package.json#packageManager" },
     ]);
     expect(detection?.scripts?.[0]?.runner).toBe("pnpm run");
@@ -123,8 +131,9 @@ describe("nodeDetector", () => {
         }),
       }),
     );
-    expect(single?.packageManagers).toEqual(["pnpm"]);
-    expect(single?.packageManagerVersions).toEqual([
+
+    expect(single?.packageManagers).toStrictEqual(["pnpm"]);
+    expect(single?.packageManagerVersions).toStrictEqual([
       { name: "pnpm", version: "^12.0.0", source: "package.json#devEngines.packageManager" },
     ]);
 
@@ -136,8 +145,9 @@ describe("nodeDetector", () => {
         }),
       }),
     );
-    expect(both?.packageManagers).toEqual(["yarn"]);
-    expect(both?.packageManagerVersions).toEqual([
+
+    expect(both?.packageManagers).toStrictEqual(["yarn"]);
+    expect(both?.packageManagerVersions).toStrictEqual([
       { name: "yarn", version: "4.5.0", source: "package.json#packageManager" },
       { name: "yarn", version: undefined, source: "package.json#devEngines.packageManager" },
       { name: "npm", version: "11", source: "package.json#devEngines.packageManager" },
@@ -148,14 +158,15 @@ describe("nodeDetector", () => {
     const yarn = await nodeDetector.detect(
       memoryFiles({ "package.json": pkg({}), "yarn.lock": "" }),
     );
-    expect(yarn?.packageManagers).toEqual(["yarn"]);
-    expect(yarn?.packageManagerVersions).toEqual([
+
+    expect(yarn?.packageManagers).toStrictEqual(["yarn"]);
+    expect(yarn?.packageManagerVersions).toStrictEqual([
       { name: "yarn", version: undefined, source: "yarn.lock" },
     ]);
 
     const none = await nodeDetector.detect(memoryFiles({ "package.json": pkg({}) }));
-    expect(none?.packageManagers).toEqual(["npm"]);
-    expect(none?.packageManagerVersions).toEqual([
+    expect(none?.packageManagers).toStrictEqual(["npm"]);
+    expect(none?.packageManagerVersions).toStrictEqual([
       { name: "npm", version: undefined, source: "default" },
     ]);
   });

@@ -1,12 +1,6 @@
 import { status } from "../../core/status.ts";
-import {
-  contextOf,
-  load,
-  positiveInt,
-  select,
-  withSelection,
-  type SelectionOptions,
-} from "../options.ts";
+import { contextOf, load, positiveInt, select, withSelection } from "../options.ts";
+import type { SelectionOptions } from "../options.ts";
 import { json, table } from "../output.ts";
 import type { Register } from "./types.ts";
 
@@ -28,11 +22,13 @@ export const registerStatus: Register = (program, run, io) => {
         command,
       ) => {
         const manifest = await load(contextOf(io, command));
+
         const results = await status(manifest, {
           projects: select(manifest, options),
           concurrency: options.concurrency,
           signal: io.signal,
         });
+
         const exitCode = results.some((result) => result.status === "failed") ? 1 : 0;
 
         const visible = options.dirty
@@ -66,36 +62,47 @@ export const registerStatus: Register = (program, run, io) => {
                 : { state: "absent" }),
             })),
           );
+
           return exitCode;
         }
 
         const { colors } = io;
+
         const rows = visible.map(({ project, status: outcome, value, error }) => {
-          if (outcome === "failed")
+          if (outcome === "failed") {
             return [colors.bold(project.name), colors.red("error"), "", colors.red(error ?? "")];
-          if (value?.state !== "present")
+          }
+
+          if (value?.state !== "present") {
             return [colors.bold(project.name), colors.dim("not cloned"), "", ""];
+          }
+
           const branch = value.branch ?? colors.yellow(`detached@${value.head ?? "?"}`);
-          const sync = !value.upstream
-            ? colors.dim("no upstream")
-            : value.ahead === 0 && value.behind === 0
+
+          const sync = value.upstream
+            ? value.ahead === 0 && value.behind === 0
               ? colors.green("✓")
               : [
                   value.ahead ? colors.yellow(`↑${value.ahead}`) : "",
                   value.behind ? colors.magenta(`↓${value.behind}`) : "",
                 ]
                   .filter(Boolean)
-                  .join(" ");
+                  .join(" ")
+            : colors.dim("no upstream");
+
           const changes =
             value.changes > 0 ? colors.red(`${value.changes} changed`) : colors.dim("clean");
+
           return [colors.bold(project.name), branch, sync, changes];
         });
+
         io.write(
           table(
             rows,
             ["PROJECT", "BRANCH", "SYNC", "CHANGES"].map((cell) => colors.dim(cell)),
           ),
         );
+
         return exitCode;
       },
     ),

@@ -1,8 +1,10 @@
 import path from "node:path";
-import { InvalidArgumentError, type Command } from "commander";
+import { InvalidArgumentError } from "commander";
+import type { Command } from "commander";
 import { loadManifest } from "../core/manifest.ts";
 import type { Manifest, Project } from "../core/model.ts";
-import { selectProjects, type Selection } from "../core/selection.ts";
+import { selectProjects } from "../core/selection.ts";
+import type { Selection } from "../core/selection.ts";
 import type { Io } from "./io.ts";
 
 interface GlobalOptions {
@@ -12,18 +14,19 @@ interface GlobalOptions {
 
 export interface Context {
   io: Io;
-  /** Resolved working directory (`-C`). */
+  /** Resolved working directory (`-C`) */
   cwd: string;
   config: string | undefined;
 }
 
 export function contextOf(io: Io, command: Command): Context {
   const globals = command.optsWithGlobals<GlobalOptions>();
+
   return { io, cwd: path.resolve(io.cwd, globals.cwd ?? "."), config: globals.config };
 }
 
 export async function load(context: Context): Promise<Manifest> {
-  return loadManifest({ cwd: context.cwd, file: context.config });
+  return await loadManifest({ cwd: context.cwd, file: context.config });
 }
 
 const list = (value: string, previous: string[] | undefined): string[] => [
@@ -36,22 +39,31 @@ const list = (value: string, previous: string[] | undefined): string[] => [
 
 export function positiveInt(value: string): number {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1)
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
     throw new InvalidArgumentError("expected a positive integer");
+  }
+
   return parsed;
 }
 
 export function positiveNumber(value: string): number {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0)
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new InvalidArgumentError("expected a positive number");
+  }
+
   return parsed;
 }
 
 export function nonNegativeInt(value: string): number {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0)
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
     throw new InvalidArgumentError("expected an integer >= 0");
+  }
+
   return parsed;
 }
 

@@ -31,24 +31,33 @@ export const registerImport: Register = (program, run, io) => {
           command,
         ) => {
           const context = contextOf(io, command);
-          if (!options.file && io.stdinIsTTY)
+
+          if (!options.file && io.stdinIsTTY) {
             throw new UsageError(
               "import expects JSON on stdin (e.g. `my-script | overrepo import`) or --file <path>",
             );
+          }
+
           const text = options.file
-            ? await readFile(path.resolve(context.cwd, options.file), "utf8")
+            ? await readFile(path.resolve(context.cwd, options.file), "utf-8")
             : await io.readStdin();
+
           const manifest = await load(context);
           const report = await importProjects(manifest, parseImportSource(text), options);
           const added = new Set(report.added);
+
           const fresh =
             options.sync && !options.dryRun && added.size > 0 ? await load(context) : undefined;
+
           const synced = fresh
             ? await sync(fresh, {
                 projects: fresh.projects.filter((project) => added.has(project.name)),
                 signal: io.signal,
                 onEvent: (event) => {
-                  if (options.json || event.type !== "done") return;
+                  if (options.json || event.type !== "done") {
+                    return;
+                  }
+
                   io.error(`${resultLine(io.colors, event.result, 28)}\n`);
                 },
               })
@@ -70,14 +79,26 @@ export const registerImport: Register = (program, run, io) => {
                   }))
                 : undefined,
             });
+
             return synced?.results.some((result) => result.status === "failed") ? 1 : 0;
           }
+
           const { colors } = io;
-          for (const name of report.added) io.error(`  ${colors.green("+")} ${name}\n`);
-          for (const [name, fields] of Object.entries(report.updated))
+
+          for (const name of report.added) {
+            io.error(`  ${colors.green("+")} ${name}\n`);
+          }
+
+          for (const [name, fields] of Object.entries(report.updated)) {
             io.error(`  ${colors.cyan("~")} ${name} ${colors.dim(`(${fields.join(", ")})`)}\n`);
-          for (const name of report.removed) io.error(`  ${colors.red("-")} ${name}\n`);
+          }
+
+          for (const name of report.removed) {
+            io.error(`  ${colors.red("-")} ${name}\n`);
+          }
+
           const notRemoved = report.missing.filter((name) => !report.removed.includes(name));
+
           if (notRemoved.length > 0) {
             io.error(
               colors.yellow(
@@ -85,15 +106,22 @@ export const registerImport: Register = (program, run, io) => {
               ),
             );
           }
+
           const verb = options.dryRun ? "would add" : "added";
           io.error(
             `\nimport: ${verb} ${report.added.length}, updated ${Object.keys(report.updated).length}, removed ${report.removed.length}${report.changed ? "" : " (no change)"}\n`,
           );
-          if (!options.sync || report.added.length === 0) return 0;
-          if (options.dryRun) {
-            io.error(io.colors.dim(`import --sync: would clone ${report.added.join(", ")}\n`));
+
+          if (!options.sync || report.added.length === 0) {
             return 0;
           }
+
+          if (options.dryRun) {
+            io.error(io.colors.dim(`import --sync: would clone ${report.added.join(", ")}\n`));
+
+            return 0;
+          }
+
           return printSummary(io, synced?.results ?? [], { label: "sync" });
         },
       ),

@@ -3,7 +3,8 @@ import pLimit from "p-limit";
 import { gitVersion, isDirectory, isGitRepo, lsRemote } from "../git/git.ts";
 import { scanRepos } from "./discover.ts";
 import { errorMessage } from "./errors.ts";
-import { loadManifest, type LocateOptions } from "./manifest.ts";
+import { loadManifest } from "./manifest.ts";
+import type { LocateOptions } from "./manifest.ts";
 import type { Manifest } from "./model.ts";
 import { isInsideDir, isWithin } from "./paths.ts";
 import { normalizeGitUrl } from "./urls.ts";
@@ -18,9 +19,9 @@ export interface Check {
 }
 
 export interface DoctorOptions extends LocateOptions {
-  /** Skip remote access checks. */
+  /** Skip remote access checks */
   network?: boolean;
-  /** Seconds per remote check. */
+  /** Seconds per remote check */
   timeout?: number;
 }
 
@@ -30,22 +31,28 @@ export interface DoctorReport {
   failed: boolean;
 }
 
-/** The manifest's own git (when it lives under the fleet root) is not a leaf clone. */
+/** The manifest's own git (when it lives under the fleet root) is not a leaf clone */
 function scanIgnores(manifest: Manifest): string[] {
   const absolute = manifest.manifestDir;
+
   if (
     !isInsideDir(manifest.root, absolute) ||
     path.resolve(absolute) === path.resolve(manifest.root)
   ) {
     return [];
   }
+
   const relative = path.relative(manifest.root, absolute).split(path.sep).join("/");
+
   return relative ? [relative] : [];
 }
 
-/** Remote checks run once per host; local remotes (`file://`, paths) count as one "local" host. */
+/** Remote checks run once per host; local remotes (`file://`, paths) count as one "local" host */
 function hostOf(url: string): string | undefined {
-  if (url.startsWith("file:") || path.isAbsolute(url)) return "local";
+  if (url.startsWith("file:") || path.isAbsolute(url)) {
+    return "local";
+  }
+
   return normalizeGitUrl(url)?.split("/")[0];
 }
 
@@ -61,6 +68,7 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
   );
 
   let manifest: Manifest | undefined;
+
   try {
     manifest = await loadManifest(options);
     add({
@@ -71,12 +79,17 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
   } catch (error) {
     add({ id: "manifest", level: "fail", message: errorMessage(error) });
   }
-  if (!manifest || !version) return { checks, manifest, failed: true };
+
+  if (!manifest || !version) {
+    return { checks, manifest, failed: true };
+  }
 
   const missing = manifest.projects.filter((project) => !isDirectory(project.dir));
+
   const notRepos = manifest.projects.filter(
     (project) => isDirectory(project.dir) && !isGitRepo(project.dir),
   );
+
   add(
     missing.length === 0
       ? { id: "clones", level: "ok", message: "every project is cloned" }
@@ -87,6 +100,7 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
           details: missing.map((project) => project.path),
         },
   );
+
   if (notRepos.length > 0) {
     add({
       id: "not-a-repo",
@@ -100,10 +114,13 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
     maxDepth: 6,
     ignore: scanIgnores(manifest),
   });
+
   const known = manifest.projects.map((project) => project.path);
+
   const orphans = scan.repos.filter(
     (repo) => !known.some((projectPath) => isWithin(repo, projectPath)),
   );
+
   add(
     orphans.length === 0
       ? { id: "orphans", level: "ok", message: "no orphan repositories" }
@@ -127,17 +144,26 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
 
   if (options.network !== false) {
     const byHost = new Map<string, string>();
+
     for (const project of manifest.projects) {
       const host = hostOf(project.url);
-      if (host && !byHost.has(host)) byHost.set(host, project.url);
+
+      if (host && !byHost.has(host)) {
+        byHost.set(host, project.url);
+      }
     }
+
     const limit = pLimit(4);
     await Promise.all(
-      [...byHost].map(([host, url]) =>
-        limit(async () => {
+      [...byHost].map(async ([host, url]) => {
+        await limit(async () => {
           try {
             await lsRemote(url, { timeout: (options.timeout ?? 20) * 1000 });
-            add({ id: `access:${host}`, level: "ok", message: `access to ${host} works (${url})` });
+            add({
+              id: `access:${host}`,
+              level: "ok",
+              message: `access to ${host} works (${url})`,
+            });
           } catch (error) {
             add({
               id: `access:${host}`,
@@ -146,8 +172,8 @@ export async function doctor(options: DoctorOptions = {}): Promise<DoctorReport>
               details: [`tested with ${url}`],
             });
           }
-        }),
-      ),
+        });
+      }),
     );
   }
 

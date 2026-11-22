@@ -4,7 +4,7 @@ import { selectProjects } from "../src/core/selection.ts";
 import { normalizeGitUrl } from "../src/core/urls.ts";
 import { parseStatus } from "../src/git/git.ts";
 
-describe("selectProjects", () => {
+describe(selectProjects, () => {
   const { projects } = parseManifest(
     `
 projects:
@@ -15,30 +15,36 @@ projects:
 `,
     "/m/overrepo.yaml",
   );
+
   const names = (selection: Parameters<typeof selectProjects>[1], requireExplicit = false) =>
     selectProjects(projects, selection, { requireExplicit }).map((project) => project.name);
 
   it("returns everything without selection, unless an explicit one is required", () => {
-    expect(names({})).toEqual(["backend/api", "backend/billing", "frontend/web", "backend/legacy"]);
+    expect(names({})).toStrictEqual([
+      "backend/api",
+      "backend/billing",
+      "frontend/web",
+      "backend/legacy",
+    ]);
     expect(() => names({}, true)).toThrow(/no projects selected/);
   });
 
   it("requires every tag", () => {
-    expect(names({ tags: ["backend", "node"] })).toEqual(["backend/api"]);
+    expect(names({ tags: ["backend", "node"] })).toStrictEqual(["backend/api"]);
   });
 
   it("filters by path prefix on segment boundaries", () => {
-    expect(names({ paths: ["backend/"] })).toEqual([
+    expect(names({ paths: ["backend/"] })).toStrictEqual([
       "backend/api",
       "backend/billing",
       "backend/legacy",
     ]);
-    expect(names({ paths: ["back"] })).toEqual([]);
-    expect(names({ paths: ["frontend/web"] })).toEqual(["frontend/web"]);
+    expect(names({ paths: ["back"] })).toStrictEqual([]);
+    expect(names({ paths: ["frontend/web"] })).toStrictEqual(["frontend/web"]);
   });
 
   it("selects by path and rejects unknown paths", () => {
-    expect(names({ projects: ["frontend/web", "backend/api"] })).toEqual([
+    expect(names({ projects: ["frontend/web", "backend/api"] })).toStrictEqual([
       "backend/api",
       "frontend/web",
     ]);
@@ -46,7 +52,7 @@ projects:
   });
 });
 
-describe("normalizeGitUrl", () => {
+describe(normalizeGitUrl, () => {
   it.each([
     ["git@github.com:Client/Repo.git", "github.com/client/repo"],
     ["https://github.com/client/repo", "github.com/client/repo"],
@@ -63,7 +69,7 @@ describe("normalizeGitUrl", () => {
   });
 });
 
-describe("parseStatus", () => {
+describe(parseStatus, () => {
   it("parses porcelain v2 output", () => {
     const status = parseStatus(
       [
@@ -75,7 +81,8 @@ describe("parseStatus", () => {
         "? new",
       ].join("\n"),
     );
-    expect(status).toEqual({
+
+    expect(status).toStrictEqual({
       branch: "main",
       head: "1234567",
       upstream: "origin/main",

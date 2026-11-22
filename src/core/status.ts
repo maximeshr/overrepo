@@ -1,6 +1,8 @@
-import { isGitRepo, repoStatus, type RepoStatus } from "../git/git.ts";
+import { isGitRepo, repoStatus } from "../git/git.ts";
+import type { RepoStatus } from "../git/git.ts";
 import type { Manifest, Project } from "./model.ts";
-import { forEachProject, ok, skipped, type ProjectResult, type RunEvent } from "./runner.ts";
+import { forEachProject, ok, skipped } from "./runner.ts";
+import type { ProjectResult, RunEvent } from "./runner.ts";
 
 export type ProjectState = { state: "absent" } | ({ state: "present" } & RepoStatus);
 
@@ -18,11 +20,16 @@ export async function status(
   options: StatusOptions = {},
 ): Promise<ProjectResult<ProjectState>[]> {
   const timeout = (options.timeout ?? manifest.defaults.timeout) * 1000;
-  return forEachProject<ProjectState>(
+
+  return await forEachProject<ProjectState>(
     options.projects ?? manifest.projects,
     async (project) => {
-      if (!isGitRepo(project.dir)) return skipped("not cloned", { state: "absent" });
+      if (!isGitRepo(project.dir)) {
+        return skipped("not cloned", { state: "absent" });
+      }
+
       const state = await repoStatus(project.dir, { timeout, signal: options.signal });
+
       return ok(undefined, { state: "present", ...state });
     },
     {
