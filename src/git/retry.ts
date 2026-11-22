@@ -48,7 +48,11 @@ export const withRetry = async <T>(
     try {
       return await operation();
     } catch (error) {
-      if (attempt >= options.retries || !isTransientGitError(error) || options.signal?.aborted) {
+      if (
+        attempt >= options.retries ||
+        !isTransientGitError(error) ||
+        options.signal?.aborted === true
+      ) {
         throw error;
       }
 
@@ -58,7 +62,10 @@ export const withRetry = async <T>(
         /* empty */
       });
 
-      if (options.signal?.aborted) {
+      // Re-read: the signal may have fired during the delay
+      const { signal } = options;
+
+      if (signal?.aborted === true) {
         throw error;
       }
     }

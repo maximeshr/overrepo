@@ -39,7 +39,7 @@ export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promi
   const { signal } = options;
 
   const cloneProject = async (project: Project): Promise<Outcome<SyncAction>> => {
-    if (options.dryRun) {
+    if (options.dryRun === true) {
       return ok("would clone", "would-clone");
     }
 
@@ -77,17 +77,17 @@ export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promi
   };
 
   const updateProject = async (project: Project): Promise<Outcome<SyncAction>> => {
-    if (!options.pull) {
+    if (options.pull !== true) {
       return ok("present", "present");
     }
 
-    if (options.dryRun) {
+    if (options.dryRun === true) {
       return ok("would pull", "would-pull");
     }
 
     const status = await repoStatus(project.dir, { timeout, signal });
 
-    if (!status.branch) {
+    if (status.branch === undefined || status.branch === "") {
       await withRetry(
         async () => {
           await fetch(project.dir, { timeout, signal });
@@ -101,7 +101,7 @@ export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promi
       return ok("fetched (detached HEAD)", "fetched");
     }
 
-    if (!status.upstream) {
+    if (status.upstream === undefined || status.upstream === "") {
       await withRetry(
         async () => {
           await fetch(project.dir, { timeout, signal });

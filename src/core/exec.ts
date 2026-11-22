@@ -56,20 +56,21 @@ const forEachLine = async (
     }
   });
 
-  await new Promise((resolve) => {
-    const flush = () => {
-      if (pending) {
-        onLine(pending);
-      }
+  const { promise, resolve } = Promise.withResolvers<undefined>();
 
-      pending = "";
-      resolve();
-    };
+  const flush = () => {
+    if (pending) {
+      onLine(pending);
+    }
 
-    stream.once("end", flush);
-    stream.once("close", flush);
-    stream.once("error", flush);
-  });
+    pending = "";
+    resolve(undefined);
+  };
+
+  stream.once("end", flush);
+  stream.once("close", flush);
+  stream.once("error", flush);
+  await promise;
 };
 
 /** Runs a command in each selected project directory. Projects that are not cloned are skipped. */
@@ -79,7 +80,7 @@ export const execInProjects = async (
 ): Promise<ProjectResult<ExecValue>[]> => {
   const [file, ...args] = typeof options.command === "string" ? [options.command] : options.command;
 
-  if (!file) {
+  if (file === undefined || file === "") {
     throw new Error("empty command");
   }
 
@@ -96,7 +97,7 @@ export const execInProjects = async (
       const output: OutputLine[] = [];
 
       const emit = (stream: OutputStream) => (line: string) => {
-        if (options.capture) {
+        if (options.capture === true) {
           output.push({ stream, line });
         }
 
@@ -111,7 +112,10 @@ export const execInProjects = async (
         stderr: stdio,
         buffer: false,
         reject: false,
-        timeout: options.timeout ? options.timeout * 1000 : undefined,
+        timeout:
+          options.timeout !== undefined && options.timeout !== 0 && !Number.isNaN(options.timeout)
+            ? options.timeout * 1000
+            : undefined,
         cancelSignal: options.signal,
         /** With `shell: true`, killing the shell alone would orphan the actual command */
         killDescendants: true,
@@ -132,7 +136,7 @@ export const execInProjects = async (
 
       const value: ExecValue = {
         exitCode: result.exitCode,
-        ...(options.capture ? { output } : {}),
+        ...(options.capture === true ? { output } : {}),
       };
 
       if (result.isCanceled) {

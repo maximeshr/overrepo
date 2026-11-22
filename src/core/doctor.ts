@@ -62,7 +62,7 @@ export const doctor = async (options: DoctorOptions = {}): Promise<DoctorReport>
 
   const version = await gitVersion();
   add(
-    version
+    version !== undefined && version !== ""
       ? { id: "git", level: "ok", message: `git ${version}` }
       : { id: "git", level: "fail", message: "git not found in PATH" },
   );
@@ -80,7 +80,7 @@ export const doctor = async (options: DoctorOptions = {}): Promise<DoctorReport>
     add({ id: "manifest", level: "fail", message: errorMessage(error) });
   }
 
-  if (!manifest || !version) {
+  if (!manifest || version === undefined || version === "") {
     return { checks, manifest, failed: true };
   }
 
@@ -148,7 +148,7 @@ export const doctor = async (options: DoctorOptions = {}): Promise<DoctorReport>
     for (const project of manifest.projects) {
       const host = hostOf(project.url);
 
-      if (host && !byHost.has(host)) {
+      if (host !== undefined && host !== "" && !byHost.has(host)) {
         byHost.set(host, project.url);
       }
     }

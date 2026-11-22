@@ -68,7 +68,7 @@ export const forEachProject = async <T>(
           const started = Date.now();
           let outcome: Outcome<T>;
 
-          if (options.signal?.aborted) {
+          if (options.signal?.aborted === true) {
             outcome = skipped("interrupted");
           } else {
             options.onEvent?.({ type: "start", project });
@@ -76,9 +76,10 @@ export const forEachProject = async <T>(
             try {
               outcome = await task(project);
             } catch (error) {
-              outcome = options.signal?.aborted
-                ? failed("interrupted")
-                : failed(errorMessage(error));
+              // Re-read: the task may have been aborted while it ran
+              const { signal } = options;
+              outcome =
+                signal?.aborted === true ? failed("interrupted") : failed(errorMessage(error));
             }
           }
 

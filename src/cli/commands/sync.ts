@@ -50,11 +50,11 @@ export const registerSync: Register = (program, run, io) => {
         retries: options.retries,
         signal: io.signal,
         onEvent: (event) => {
-          if (options.json || event.type !== "done") {
+          if (options.json === true || event.type !== "done") {
             return;
           }
 
-          if (options.quiet && event.result.status !== "failed") {
+          if (options.quiet === true && event.result.status !== "failed") {
             return;
           }
 
@@ -62,7 +62,7 @@ export const registerSync: Register = (program, run, io) => {
         },
       });
 
-      if (options.json) {
+      if (options.json === true) {
         json(io, {
           results: report.results.map((result) => ({
             name: result.project.name,
@@ -78,7 +78,7 @@ export const registerSync: Register = (program, run, io) => {
       }
 
       return printSummary(io, report.results, {
-        label: options.dryRun ? "sync (dry run)" : "sync",
+        label: options.dryRun === true ? "sync (dry run)" : "sync",
       });
     }),
   );

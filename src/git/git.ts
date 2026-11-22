@@ -40,7 +40,7 @@ const lastMeaningfulLine = (stderr: string): string => {
   const lines = stderr
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line && !/^(hint|warning):/i.test(line));
+    .filter((line) => line !== "" && !/^(hint|warning):/i.test(line));
 
   const fatal = lines.find((line) => /^(fatal|error):/i.test(line));
 
@@ -69,7 +69,11 @@ const hasCustomSshCommand = async (): Promise<boolean> => {
 const nonInteractiveEnv = async (): Promise<Record<string, string>> => {
   const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
 
-  if (!process.env.GIT_SSH_COMMAND && !process.env.GIT_SSH && !(await hasCustomSshCommand())) {
+  if (
+    (process.env.GIT_SSH_COMMAND === undefined || process.env.GIT_SSH_COMMAND === "") &&
+    (process.env.GIT_SSH === undefined || process.env.GIT_SSH === "") &&
+    !(await hasCustomSshCommand())
+  ) {
     env.GIT_SSH_COMMAND = "ssh -o BatchMode=yes";
   }
 

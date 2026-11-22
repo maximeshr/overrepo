@@ -31,16 +31,19 @@ export const registerStatus: Register = (program, run, io) => {
 
         const exitCode = results.some((result) => result.status === "failed") ? 1 : 0;
 
-        const visible = options.dirty
-          ? results.filter(
-              (result) =>
-                result.status === "failed" ||
-                (result.value?.state === "present" &&
-                  (result.value.changes > 0 || result.value.ahead > 0 || result.value.behind > 0)),
-            )
-          : results;
+        const visible =
+          options.dirty === true
+            ? results.filter(
+                (result) =>
+                  result.status === "failed" ||
+                  (result.value?.state === "present" &&
+                    (result.value.changes > 0 ||
+                      result.value.ahead > 0 ||
+                      result.value.behind > 0)),
+              )
+            : results;
 
-        if (options.json) {
+        if (options.json === true) {
           json(
             io,
             visible.map(({ project, status: outcome, value, error }) => ({
@@ -79,16 +82,17 @@ export const registerStatus: Register = (program, run, io) => {
 
           const branch = value.branch ?? colors.yellow(`detached@${value.head ?? "?"}`);
 
-          const sync = value.upstream
-            ? value.ahead === 0 && value.behind === 0
-              ? colors.green("✓")
-              : [
-                  value.ahead ? colors.yellow(`↑${value.ahead}`) : "",
-                  value.behind ? colors.magenta(`↓${value.behind}`) : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")
-            : colors.dim("no upstream");
+          const sync =
+            value.upstream !== undefined && value.upstream !== ""
+              ? value.ahead === 0 && value.behind === 0
+                ? colors.green("✓")
+                : [
+                    value.ahead ? colors.yellow(`↑${value.ahead}`) : "",
+                    value.behind ? colors.magenta(`↓${value.behind}`) : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")
+              : colors.dim("no upstream");
 
           const changes =
             value.changes > 0 ? colors.red(`${value.changes} changed`) : colors.dim("clean");

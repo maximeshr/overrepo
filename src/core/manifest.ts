@@ -33,7 +33,7 @@ export interface ManifestLocation {
 export const locateManifest = (options: LocateOptions = {}): ManifestLocation | undefined => {
   const cwd = path.resolve(options.cwd ?? process.cwd());
 
-  if (options.file) {
+  if (options.file !== undefined && options.file !== "") {
     const file = path.resolve(cwd, options.file);
 
     return existsSync(file) ? { file } : undefined;
@@ -64,9 +64,10 @@ export const loadManifest = async (options: LocateOptions = {}): Promise<Manifes
   const location = locateManifest(options);
 
   if (!location) {
-    const where = options.file
-      ? `"${options.file}"`
-      : `overrepo.yaml in ${options.cwd ?? process.cwd()} or its parents`;
+    const where =
+      options.file !== undefined && options.file !== ""
+        ? `"${options.file}"`
+        : `overrepo.yaml in ${options.cwd ?? process.cwd()} or its parents`;
 
     throw new ManifestError(undefined, [
       { path: "", message: `no manifest found (looked for ${where}); run \`overrepo init\`` },
@@ -267,12 +268,13 @@ const resolveManifest = (
       });
     }
 
+    const desc = project.desc?.trim();
     projects.push({
       name: projectPath,
       path: projectPath,
       dir: projectDir,
       url: project.url,
-      desc: project.desc?.trim() || undefined,
+      desc: desc === "" ? undefined : desc,
       tags: [...new Set(project.tags)],
     });
   }

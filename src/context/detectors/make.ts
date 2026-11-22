@@ -12,7 +12,12 @@ const makeTargets = (makefile: string): string[] => {
     const match = /^([A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/.exec(line);
     const target = match?.[1];
 
-    if (target && !target.includes("%") && !targets.includes(target)) {
+    if (
+      target !== undefined &&
+      target !== "" &&
+      !target.includes("%") &&
+      !targets.includes(target)
+    ) {
       targets.push(target);
     }
   }
@@ -26,7 +31,7 @@ export const makeDetector: Detector = {
     const scripts: Script[] = [];
     const makefile = MAKEFILES.find((file) => files.topLevel.includes(file));
 
-    if (makefile) {
+    if (makefile !== undefined && makefile !== "") {
       for (const name of makeTargets((await files.readText(makefile)) ?? "")) {
         scripts.push({ runner: "make", name });
       }
@@ -36,7 +41,7 @@ export const makeDetector: Detector = {
       files.topLevel.includes(file),
     );
 
-    if (taskfile) {
+    if (taskfile !== undefined && taskfile !== "") {
       try {
         const parsed: unknown = parse((await files.readText(taskfile)) ?? "");
 

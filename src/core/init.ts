@@ -90,14 +90,14 @@ const scanManifest = async (
   );
 
   for (const { repo, url, desc } of details) {
-    if (!url) {
+    if (url === undefined || url === "") {
       warnings.push(`${repo}: no "origin" remote, skipped`);
       continue;
     }
 
     const project: Record<string, unknown> = { url };
 
-    if (desc) {
+    if (desc !== undefined && desc !== "") {
       project.desc = desc;
     }
 
@@ -122,7 +122,12 @@ export const init = async (options: InitOptions): Promise<InitResult> => {
     existsSync(candidate),
   );
 
-  if (existing && !options.force && !options.dryRun) {
+  if (
+    existing !== undefined &&
+    existing !== "" &&
+    options.force !== true &&
+    options.dryRun !== true
+  ) {
     throw new OverrepoError(
       `${path.basename(existing)} already exists; use \`overrepo import\` to add projects or --force to overwrite`,
       2,
@@ -146,7 +151,7 @@ export const init = async (options: InitOptions): Promise<InitResult> => {
     throw error;
   }
 
-  if (!options.dryRun) {
+  if (options.dryRun !== true) {
     await writeFile(file, text);
   }
 
@@ -154,5 +159,5 @@ export const init = async (options: InitOptions): Promise<InitResult> => {
     (manifest.projects as Record<string, unknown> | undefined) ?? {},
   ).length;
 
-  return { file, text, projectCount, warnings, written: !options.dryRun };
+  return { file, text, projectCount, warnings, written: options.dryRun !== true };
 };

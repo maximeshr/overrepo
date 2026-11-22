@@ -33,9 +33,9 @@ export const registerContext: Register = (program, run, io) => {
           progress.clear();
         });
 
-        const exitCode = options.check && report.stale ? 1 : 0;
+        const exitCode = options.check === true && report.stale ? 1 : 0;
 
-        if (options.json) {
+        if (options.json === true) {
           json(io, { stale: report.stale, files: report.files });
 
           return exitCode;
@@ -69,7 +69,7 @@ export const registerContext: Register = (program, run, io) => {
           `\ncontext: ${[...counts].map(([status, count]) => `${count} ${status}`).join(", ")}\n`,
         );
 
-        if (options.check && report.stale) {
+        if (options.check === true && report.stale) {
           io.error(
             colors.red("summaries are outdated: run `overrepo context` and commit the result\n"),
           );

@@ -55,7 +55,7 @@ export const readmeExcerpt = (
   for (const line of text.split("\n")) {
     const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
 
-    if (fenceMatch?.[1]) {
+    if (fenceMatch?.[1] !== undefined && fenceMatch?.[1] !== "") {
       const marker = fenceMatch[1];
 
       if (fence === undefined) {
@@ -122,7 +122,7 @@ export const readmeExcerpt = (
     size += line.length + 1;
     const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
 
-    if (marker) {
+    if (marker !== undefined && marker !== "") {
       open = open === undefined ? marker : undefined;
     }
   }

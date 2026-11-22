@@ -55,7 +55,7 @@ describe(versionFileValue, () => {
   });
 });
 
-describe(nodeDetector, () => {
+describe("node detector", () => {
   it("reads engines, devEngines, .nvmrc and .node-version with their source", async () => {
     const detection = await nodeDetector.detect(
       memoryFiles({

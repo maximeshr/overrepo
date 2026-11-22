@@ -26,7 +26,7 @@ export const registerInit: Register = (program, run, io) => {
           warn(io, warning);
         }
 
-        if (options.dryRun) {
+        if (options.dryRun === true) {
           io.write(result.text);
 
           return 0;

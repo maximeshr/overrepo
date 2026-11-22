@@ -67,9 +67,11 @@ const packageManagerLabel = (analysis: Analysis, name: string): string => {
     return name;
   }
 
-  const version = specs.find((spec) => spec.version)?.version;
+  const version = specs.find((spec) => spec.version !== undefined && spec.version !== "")?.version;
 
-  return version ? `${name} ${version}` : `${name} (version not declared)`;
+  return version !== undefined && version !== ""
+    ? `${name} ${version}`
+    : `${name} (version not declared)`;
 };
 
 const render = (input: CardInput, limits: Limits): string => {
@@ -97,7 +99,7 @@ const render = (input: CardInput, limits: Limits): string => {
     "",
   );
 
-  if (project.desc) {
+  if (project.desc !== undefined && project.desc !== "") {
     out.push(project.desc, "");
   }
 
@@ -161,7 +163,7 @@ const render = (input: CardInput, limits: Limits): string => {
     const scripts = analysis.scripts.map((script) => {
       const invocation = code(`${script.runner} ${script.name}`);
 
-      return script.cmd
+      return script.cmd !== undefined && script.cmd !== ""
         ? `- ${invocation} — ${code(truncate(script.cmd, MAX_SCRIPT_COMMAND))}`
         : `- ${invocation}`;
     });
@@ -208,7 +210,13 @@ const render = (input: CardInput, limits: Limits): string => {
     out.push("## Structure", "", "```text", ...shown, "```", "");
   }
 
-  if (analysis.readme && analysis.readmeFile && limits.readmeChars > 0) {
+  if (
+    analysis.readme !== undefined &&
+    analysis.readme !== "" &&
+    analysis.readmeFile !== undefined &&
+    analysis.readmeFile !== "" &&
+    limits.readmeChars > 0
+  ) {
     const excerpt = readmeExcerpt(analysis.readme, limits.readmeChars);
 
     if (excerpt.text) {

@@ -12,7 +12,7 @@ const dockerBaseImages = (dockerfile: string): string[] => {
   for (const line of dockerfile.split("\n")) {
     const match = /^\s*FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i.exec(line);
 
-    if (!match?.[1]) {
+    if (match?.[1] === undefined || match?.[1] === "") {
       continue;
     }
 
@@ -22,7 +22,7 @@ const dockerBaseImages = (dockerfile: string): string[] => {
       images.push(image);
     }
 
-    if (match[2]) {
+    if (match[2] !== undefined && match[2] !== "") {
       stages.add(match[2].toLowerCase());
     }
   }
@@ -43,7 +43,7 @@ export const dockerDetector: Detector = {
 
     const composeFile = COMPOSE_FILES.find((file) => files.topLevel.includes(file));
 
-    if (composeFile) {
+    if (composeFile !== undefined && composeFile !== "") {
       let services: string[] = [];
 
       try {

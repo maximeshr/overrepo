@@ -32,29 +32,32 @@ export const registerImport: Register = (program, run, io) => {
         ) => {
           const context = contextOf(io, command);
 
-          if (!options.file && io.stdinIsTTY) {
+          if ((options.file === undefined || options.file === "") && io.stdinIsTTY) {
             throw new UsageError(
               "import expects JSON on stdin (e.g. `my-script | overrepo import`) or --file <path>",
             );
           }
 
-          const text = options.file
-            ? await readFile(path.resolve(context.cwd, options.file), "utf-8")
-            : await io.readStdin();
+          const text =
+            options.file !== undefined && options.file !== ""
+              ? await readFile(path.resolve(context.cwd, options.file), "utf-8")
+              : await io.readStdin();
 
           const manifest = await load(context);
           const report = await importProjects(manifest, parseImportSource(text), options);
           const added = new Set(report.added);
 
           const fresh =
-            options.sync && !options.dryRun && added.size > 0 ? await load(context) : undefined;
+            options.sync === true && options.dryRun !== true && added.size > 0
+              ? await load(context)
+              : undefined;
 
           const synced = fresh
             ? await sync(fresh, {
                 projects: fresh.projects.filter((project) => added.has(project.name)),
                 signal: io.signal,
                 onEvent: (event) => {
-                  if (options.json || event.type !== "done") {
+                  if (options.json === true || event.type !== "done") {
                     return;
                   }
 
@@ -63,14 +66,14 @@ export const registerImport: Register = (program, run, io) => {
               })
             : undefined;
 
-          if (options.json) {
+          if (options.json === true) {
             json(io, {
               added: report.added,
               updated: report.updated,
               missing: report.missing,
               removed: report.removed,
               changed: report.changed,
-              written: report.changed && !options.dryRun,
+              written: report.changed && options.dryRun !== true,
               synced: synced
                 ? synced.results.map((result) => ({
                     name: result.project.name,
@@ -80,7 +83,7 @@ export const registerImport: Register = (program, run, io) => {
                 : undefined,
             });
 
-            return synced?.results.some((result) => result.status === "failed") ? 1 : 0;
+            return synced?.results.some((result) => result.status === "failed") === true ? 1 : 0;
           }
 
           const { colors } = io;
@@ -107,16 +110,16 @@ export const registerImport: Register = (program, run, io) => {
             );
           }
 
-          const verb = options.dryRun ? "would add" : "added";
+          const verb = options.dryRun === true ? "would add" : "added";
           io.error(
             `\nimport: ${verb} ${report.added.length}, updated ${Object.keys(report.updated).length}, removed ${report.removed.length}${report.changed ? "" : " (no change)"}\n`,
           );
 
-          if (!options.sync || report.added.length === 0) {
+          if (options.sync !== true || report.added.length === 0) {
             return 0;
           }
 
-          if (options.dryRun) {
+          if (options.dryRun === true) {
             io.error(io.colors.dim(`import --sync: would clone ${report.added.join(", ")}\n`));
 
             return 0;

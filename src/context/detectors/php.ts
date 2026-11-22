@@ -80,7 +80,7 @@ export const phpDetector: Detector = {
           : [],
     };
 
-    if (require.php) {
+    if (require.php !== undefined && require.php !== "") {
       detection.runtimes = [`PHP ${require.php}`];
     }
 

@@ -93,7 +93,7 @@ export const parsePackageManagerField = (
 ): { name: string; version: string | undefined } | undefined => {
   const match = /^([a-z]+)(?:@([^+\s]+)|$)/.exec(value.trim());
 
-  if (!match?.[1]) {
+  if (match?.[1] === undefined || match?.[1] === "") {
     return undefined;
   }
 
@@ -132,12 +132,12 @@ const nodeVersions = async (
   const specs: VersionSpec[] = [];
   const engine = stringRecord(pkg?.engines).node;
 
-  if (engine) {
+  if (engine !== undefined && engine !== "") {
     specs.push({ name: "node", version: engine, source: "package.json#engines.node" });
   }
 
   for (const entry of devEngineEntries(pkg?.devEngines, "runtime")) {
-    if (entry.name === "node" && entry.version) {
+    if (entry.name === "node" && entry.version !== undefined && entry.version !== "") {
       specs.push({
         name: "node",
         version: entry.version,
@@ -154,7 +154,7 @@ const nodeVersions = async (
     const text = await files.readText(file);
     const version = text === undefined ? undefined : versionFileValue(text);
 
-    if (version) {
+    if (version !== undefined && version !== "") {
       specs.push({ name: "node", version, source: file });
     }
   }

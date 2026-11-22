@@ -27,8 +27,12 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
     if (inRequire) {
       if (line === ")") {
         inRequire = false;
-      } else if (line.split(/\s+/)[0]) {
-        result.requires.push(line.split(/\s+/)[0]!);
+      } else {
+        const [dependency] = line.split(/\s+/);
+
+        if (dependency !== undefined && dependency !== "") {
+          result.requires.push(dependency);
+        }
       }
 
       continue;
@@ -43,7 +47,7 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
     } else if (directive === "require") {
       if (rest[0] === "(") {
         inRequire = true;
-      } else if (rest[0]) {
+      } else if (rest[0] !== undefined && rest[0] !== "") {
         result.requires.push(rest[0]);
       }
     }
@@ -70,12 +74,15 @@ export const goDetector: Detector = {
       languages: ["Go"],
       frameworks: known((name) => requires.includes(name), FRAMEWORKS),
       packageManagers: ["go modules"],
-      packages: mod.module ? [{ ecosystem: "go", name: stripMajor(mod.module) }] : [],
+      packages:
+        mod.module !== undefined && mod.module !== ""
+          ? [{ ecosystem: "go", name: stripMajor(mod.module) }]
+          : [],
       dependencies: requires.map((name) => ({ ecosystem: "go", name })),
       references: requires.map((name) => `https://${name}`),
     };
 
-    if (mod.go) {
+    if (mod.go !== undefined && mod.go !== "") {
       detection.runtimes = [`Go ${mod.go}`];
     }
 

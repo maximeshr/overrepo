@@ -18,7 +18,7 @@ interface ExecFlags extends SelectionOptions {
   json?: boolean;
 }
 
-const withExecOptions = (command: Command): Command => 
+const withExecOptions = (command: Command): Command =>
   withSelection(command)
     .option("--parallel", "run in parallel")
     .option("-j, --concurrency <n>", "run in parallel with this concurrency", positiveInt)
@@ -27,8 +27,7 @@ const withExecOptions = (command: Command): Command =>
       "prefix (live, prefixed lines) | grouped (one block per project) | raw (sequential, interactive)",
     )
     .option("--timeout <seconds>", "kill the command after this delay", positiveNumber)
-    .option("--json", "capture output and print results as JSON")
-;
+    .option("--json", "capture output and print results as JSON");
 
 /** Runs one command in each selected project. Returns the exit code. */
 const runInProjects = async (
@@ -38,7 +37,9 @@ const runInProjects = async (
   command: string | string[],
   flags: ExecFlags,
 ): Promise<number> => {
-  const concurrency = flags.concurrency ?? (flags.parallel ? manifest.defaults.concurrency : 1);
+  const concurrency =
+    flags.concurrency ?? (flags.parallel === true ? manifest.defaults.concurrency : 1);
+
   const mode: OutputMode = flags.output ?? "prefix";
 
   if (!["prefix", "grouped", "raw"].includes(mode)) {
@@ -49,7 +50,7 @@ const runInProjects = async (
     throw new UsageError("--output raw cannot be combined with parallel execution");
   }
 
-  if (mode === "raw" && flags.json) {
+  if (mode === "raw" && flags.json === true) {
     throw new UsageError("--output raw cannot be combined with --json");
   }
 
@@ -72,15 +73,19 @@ const runInProjects = async (
     stdio: mode === "raw" ? "inherit" : "pipe",
     capture: flags.json === true || mode === "grouped",
     env:
-      io.stdoutIsTTY && mode !== "raw" && !process.env.NO_COLOR ? { FORCE_COLOR: "1" } : undefined,
+      io.stdoutIsTTY &&
+      mode !== "raw" &&
+      (process.env.NO_COLOR === undefined || process.env.NO_COLOR === "")
+        ? { FORCE_COLOR: "1" }
+        : undefined,
     onOutput:
-      flags.json || mode !== "prefix"
+      flags.json === true || mode !== "prefix"
         ? undefined
         : (project, { line }) => {
             io.write(`${prefix(project)} ${line}\n`);
           },
     onEvent: (event) => {
-      if (flags.json) {
+      if (flags.json === true) {
         return;
       }
 
@@ -112,7 +117,7 @@ const runInProjects = async (
     },
   });
 
-  if (flags.json) {
+  if (flags.json === true) {
     json(
       io,
       results.map((result) => ({

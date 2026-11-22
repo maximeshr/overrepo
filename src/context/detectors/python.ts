@@ -63,13 +63,13 @@ export const pythonDetector: Detector = {
 
     const name = /^name\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
 
-    if (name) {
+    if (name !== undefined && name !== "") {
       detection.packages = [{ ecosystem: "pypi", name: name.toLowerCase() }];
     }
 
     const requires = /^requires-python\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
 
-    if (requires) {
+    if (requires !== undefined && requires !== "") {
       detection.runtimes = [`Python ${requires}`];
     }
 

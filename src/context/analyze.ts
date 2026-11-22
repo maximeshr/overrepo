@@ -150,7 +150,7 @@ export const analyzeProject = async (
     ...files.topLevel.filter((file) => README_PATTERN.test(file)).toSorted(),
   ].find((file) => files.topLevel.includes(file));
 
-  if (readmeFile) {
+  if (readmeFile !== undefined && readmeFile !== "") {
     analysis.readmeFile = readmeFile;
     analysis.readme = await files.readText(readmeFile);
   }
@@ -166,7 +166,10 @@ export const analyzeProject = async (
   }
 
   const covered = new Set(
-    [...analysis.agentFiles, ...(readmeFile ? [readmeFile] : [])].map((file) => file.toLowerCase()),
+    [
+      ...analysis.agentFiles,
+      ...(readmeFile !== undefined && readmeFile !== "" ? [readmeFile] : []),
+    ].map((file) => file.toLowerCase()),
   );
 
   for (const file of include) {

@@ -17,7 +17,7 @@ export const registerList: Register = (program, run, io) => {
       const manifest = await load(contextOf(io, command));
       const projects = select(manifest, options);
 
-      if (options.json) {
+      if (options.json === true) {
         json(
           io,
           projects.map((project) => ({
@@ -32,7 +32,7 @@ export const registerList: Register = (program, run, io) => {
         return 0;
       }
 
-      if (options.names) {
+      if (options.names === true) {
         io.write(projects.map((project) => `${project.name}\n`).join(""));
 
         return 0;

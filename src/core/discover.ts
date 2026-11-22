@@ -61,7 +61,7 @@ export const scanRepos = async (root: string, options: ScanOptions = {}): Promis
       if (entry.name.endsWith(PARTIAL_SUFFIX) && entry.name.startsWith(".")) {
         const partial = await directoryChild(dir, entry);
 
-        if (partial) {
+        if (partial !== undefined && partial !== "") {
           result.partials.push(toPosixRelative(root, partial));
         }
 
@@ -74,7 +74,7 @@ export const scanRepos = async (root: string, options: ScanOptions = {}): Promis
 
       const child = await directoryChild(dir, entry);
 
-      if (!child) {
+      if (child === undefined || child === "") {
         continue;
       }
 

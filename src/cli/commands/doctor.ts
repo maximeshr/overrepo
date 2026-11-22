@@ -25,7 +25,7 @@ export const registerDoctor: Register = (program, run, io) => {
         // An unusable manifest is a configuration error (2), other failures are runtime failures (1)
         const exitCode = report.manifest ? (report.failed ? 1 : 0) : 2;
 
-        if (options.json) {
+        if (options.json === true) {
           json(io, { failed: report.failed, checks: report.checks });
 
           return exitCode;

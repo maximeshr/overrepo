@@ -27,7 +27,7 @@ export const rustDetector: Detector = {
 
     const name = /\[package\][^[]*?^name\s*=\s*"([^"]+)"/ms.exec(cargo)?.[1];
 
-    if (name) {
+    if (name !== undefined && name !== "") {
       detection.packages = [{ ecosystem: "cargo", name }];
     }
 
@@ -45,11 +45,15 @@ export const jvmDetector: Detector = {
       files.topLevel.includes(file),
     );
 
-    if (pom === undefined && !gradleFile) {
+    if (pom === undefined && (gradleFile === undefined || gradleFile === "")) {
       return;
     }
 
-    const gradle = gradleFile ? ((await files.readText(gradleFile)) ?? "") : "";
+    const gradle =
+      gradleFile !== undefined && gradleFile !== ""
+        ? ((await files.readText(gradleFile)) ?? "")
+        : "";
+
     const corpus = `${pom ?? ""}\n${gradle}`;
     const kotlin = gradleFile === "build.gradle.kts" || /kotlin/i.test(gradle);
 

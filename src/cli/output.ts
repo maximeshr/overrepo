@@ -113,7 +113,9 @@ export const printSummary = (
     colors.dim(`${counts.skipped} skipped`),
   ];
 
-  io.error(`\n${options.label ? `${options.label}: ` : ""}${parts.join(", ")}\n`);
+  io.error(
+    `\n${options.label !== undefined && options.label !== "" ? `${options.label}: ` : ""}${parts.join(", ")}\n`,
+  );
 
   return counts.failed > 0 ? 1 : 0;
 };

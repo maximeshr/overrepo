@@ -66,7 +66,7 @@ const internalDependencies = (
 
     const url = analysis.project.url && normalizeGitUrl(analysis.project.url);
 
-    if (url) {
+    if (url !== undefined && url !== "") {
       byUrl.set(url, analysis.project);
     }
   }
@@ -107,7 +107,7 @@ const internalDependencies = (
 
     for (const reference of analysis.references) {
       const url = normalizeGitUrl(reference);
-      const target = url ? byUrl.get(url) : undefined;
+      const target = url !== undefined && url !== "" ? byUrl.get(url) : undefined;
 
       if (target) {
         connect(analysis.project, target, "git dependency");
@@ -203,7 +203,7 @@ export const generateContext = async (
       return;
     }
 
-    if (options.check) {
+    if (options.check === true) {
       files.push({ path: relative, status: "stale", project });
 
       return;
@@ -258,11 +258,11 @@ export const generateContext = async (
 
     const content = await readIfExists(path.join(base, ...file.split("/")));
 
-    if (!content?.includes("generated-by: overrepo")) {
+    if (content?.includes("generated-by: overrepo") !== true) {
       continue;
     }
 
-    if (options.prune && !options.check) {
+    if (options.prune === true && options.check !== true) {
       await rm(path.join(base, ...file.split("/")));
       files.push({ path: file, status: "removed" });
     } else {

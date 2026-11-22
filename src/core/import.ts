@@ -135,7 +135,7 @@ export const importProjects = async (
   for (const project of manifest.projects) {
     const key = normalizeGitUrl(project.url);
 
-    if (key) {
+    if (key !== undefined && key !== "") {
       byUrl.set(key, project.name);
     }
   }
@@ -154,11 +154,17 @@ export const importProjects = async (
   const matched = new Set<string>();
 
   for (const source of incoming) {
-    const urlKey = source.url ? normalizeGitUrl(source.url) : undefined;
-    const target = known.has(source.name) ? source.name : urlKey ? byUrl.get(urlKey) : undefined;
+    const urlKey =
+      source.url !== undefined && source.url !== "" ? normalizeGitUrl(source.url) : undefined;
+
+    const target = known.has(source.name)
+      ? source.name
+      : urlKey !== undefined && urlKey !== ""
+        ? byUrl.get(urlKey)
+        : undefined;
 
     if (target === undefined) {
-      if (!source.url) {
+      if (source.url === undefined || source.url === "") {
         throw new OverrepoError(`import: project "${source.name}" needs a url`, 2);
       }
 
@@ -202,7 +208,7 @@ export const importProjects = async (
         continue;
       }
 
-      if (current !== undefined && !options.overwrite) {
+      if (current !== undefined && options.overwrite !== true) {
         continue;
       }
 
@@ -219,7 +225,7 @@ export const importProjects = async (
     .map((project) => project.name)
     .filter((name) => !matched.has(name));
 
-  if (options.prune) {
+  if (options.prune === true) {
     for (const name of report.missing) {
       projects.delete(name);
     }
@@ -244,7 +250,7 @@ export const importProjects = async (
     throw error;
   }
 
-  if (report.changed && !options.dryRun) {
+  if (report.changed && options.dryRun !== true) {
     await writeFile(manifest.file, text);
   }
 

@@ -29,7 +29,7 @@ export const selectProjects = (
   selection: Selection = {},
   options: SelectOptions = {},
 ): Project[] => {
-  if (options.requireExplicit && !hasExplicitSelection(selection)) {
+  if (options.requireExplicit === true && !hasExplicitSelection(selection)) {
     throw new UsageError("no projects selected: pass --all, --tags, --paths or --projects");
   }
 
