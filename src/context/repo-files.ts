@@ -53,7 +53,7 @@ export const openRepoFiles = async (dir: string, ref: string): Promise<RepoFiles
       }
 
       try {
-        // SAFETY: none is checked, by contract: like JSON.parse, readJson<T> trusts the T its caller names
+        // SAFETY: unchecked by design. Like JSON.parse, readJson<T> trusts the T its caller names
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- public RepoFiles API, the caller names T and validates the value
         return JSON.parse(text) as T;
       } catch {
