@@ -1,8 +1,10 @@
 import path from "node:path";
-import { InvalidArgumentError, type Command } from "commander";
+import { InvalidArgumentError } from "commander";
+import type { Command } from "commander";
 import { loadManifest } from "../core/manifest.ts";
 import type { Manifest, Project } from "../core/model.ts";
-import { selectProjects, type Selection } from "../core/selection.ts";
+import { selectProjects } from "../core/selection.ts";
+import type { Selection } from "../core/selection.ts";
 import type { Io } from "./io.ts";
 
 interface GlobalOptions {
@@ -12,19 +14,19 @@ interface GlobalOptions {
 
 export interface Context {
   io: Io;
-  /** Resolved working directory (`-C`). */
+  /** Resolved working directory (`-C`) */
   cwd: string;
   config: string | undefined;
 }
 
-export function contextOf(io: Io, command: Command): Context {
+export const contextOf = (io: Io, command: Command): Context => {
   const globals = command.optsWithGlobals<GlobalOptions>();
-  return { io, cwd: path.resolve(io.cwd, globals.cwd ?? "."), config: globals.config };
-}
 
-export async function load(context: Context): Promise<Manifest> {
-  return loadManifest({ cwd: context.cwd, file: context.config });
-}
+  return { io, cwd: path.resolve(io.cwd, globals.cwd ?? "."), config: globals.config };
+};
+
+export const load = async (context: Context): Promise<Manifest> =>
+  await loadManifest({ cwd: context.cwd, file: context.config });
 
 const list = (value: string, previous: string[] | undefined): string[] => [
   ...(previous ?? []),
@@ -34,26 +36,35 @@ const list = (value: string, previous: string[] | undefined): string[] => [
     .filter(Boolean),
 ];
 
-export function positiveInt(value: string): number {
+export const positiveInt = (value: string): number => {
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1)
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
     throw new InvalidArgumentError("expected a positive integer");
-  return parsed;
-}
+  }
 
-export function positiveNumber(value: string): number {
+  return parsed;
+};
+
+export const positiveNumber = (value: string): number => {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0)
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new InvalidArgumentError("expected a positive number");
-  return parsed;
-}
+  }
 
-export function nonNegativeInt(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0)
-    throw new InvalidArgumentError("expected an integer >= 0");
   return parsed;
-}
+};
+
+export const nonNegativeInt = (value: string): number => {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new InvalidArgumentError("expected an integer >= 0");
+  }
+
+  return parsed;
+};
 
 export interface SelectionOptions {
   all?: boolean;
@@ -62,27 +73,22 @@ export interface SelectionOptions {
   projects?: string[];
 }
 
-export function withSelection(command: Command): Command {
-  return command
+export const withSelection = (command: Command): Command =>
+  command
     .option("-a, --all", "select every project")
     .option("-t, --tags <tags>", "projects having all these tags (comma-separated)", list)
     .option("--paths <prefixes>", "projects under these path prefixes", list)
     .option("-p, --projects <paths>", "projects by path (the manifest key)", list);
-}
 
-function selection(options: SelectionOptions): Selection {
-  return {
-    all: options.all,
-    tags: options.tags,
-    paths: options.paths,
-    projects: options.projects,
-  };
-}
+const selection = (options: SelectionOptions): Selection => ({
+  all: options.all,
+  tags: options.tags,
+  paths: options.paths,
+  projects: options.projects,
+});
 
-export function select(
+export const select = (
   manifest: Manifest,
   options: SelectionOptions,
   requireExplicit = false,
-): Project[] {
-  return selectProjects(manifest.projects, selection(options), { requireExplicit });
-}
+): Project[] => selectProjects(manifest.projects, selection(options), { requireExplicit });

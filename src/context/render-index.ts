@@ -3,44 +3,73 @@ import type { Project } from "../core/model.ts";
 import { code, linkTarget, manualBlock, tableCell } from "./markdown.ts";
 
 export interface IndexInput {
+  /** Every project of the manifest */
   projects: Project[];
-  /** Index path relative to the root. */
+  /** Index path relative to the root */
   index: string;
-  /** Card path (relative to the root) of each project. */
+  /** Card path (relative to the root) of each project */
   cardOf: (project: Project) => string;
+  /** Manifest file name, quoted in the generated header */
   manifestName: string;
+  /** Hand-written block kept from the previous index */
   manual: string | undefined;
 }
 
 const TOP_LEVEL = "(top level)";
 const UNTAGGED = "other";
 
-const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const compare = (a: string, b: string): number => {
+  if (a < b) {
+    return -1;
+  }
 
-function folderOf(project: Project): string {
+  return a > b ? 1 : 0;
+};
+
+/** Top-level projects first, then folders by name */
+const compareFolders = (a: string, b: string): number => {
+  if (a === TOP_LEVEL) {
+    return -1;
+  }
+
+  return b === TOP_LEVEL ? 1 : compare(a, b);
+};
+
+/** Groups by name, untagged projects last */
+const compareGroups = (a: string, b: string): number => {
+  if (a === UNTAGGED) {
+    return 1;
+  }
+
+  return b === UNTAGGED ? -1 : compare(a, b);
+};
+
+const folderOf = (project: Project): string => {
   const slash = project.path.indexOf("/");
+
   return slash === -1 ? TOP_LEVEL : project.path.slice(0, slash);
-}
+};
 
-/** First tag that says more than the folder name. */
-function primaryTag(project: Project, folder: string): string {
-  return project.tags.find((tag) => tag !== folder) ?? UNTAGGED;
-}
+/** First tag that says more than the folder name */
+const primaryTag = (project: Project, folder: string): string =>
+  project.tags.find((tag) => tag !== folder) ?? UNTAGGED;
 
-function groupBy<T>(items: T[], key: (item: T) => string): Map<string, T[]> {
+const groupBy = <T>(items: T[], key: (item: T) => string): Map<string, T[]> => {
   const groups = new Map<string, T[]>();
+
   for (const item of items) {
     const name = key(item);
     groups.set(name, [...(groups.get(name) ?? []), item]);
   }
-  return groups;
-}
 
-export function renderIndex(input: IndexInput): string {
+  return groups;
+};
+
+export const renderIndex = (input: IndexInput): string => {
   const folders = groupBy(input.projects, folderOf);
-  const folderNames = [...folders.keys()].sort((a, b) =>
-    a === TOP_LEVEL ? -1 : b === TOP_LEVEL ? 1 : compare(a, b),
-  );
+
+  const folderNames = [...folders.keys()].toSorted(compareFolders);
+
   const indexDir = path.posix.dirname(input.index);
 
   const out: string[] = [
@@ -60,22 +89,27 @@ export function renderIndex(input: IndexInput): string {
     const projects = folders.get(folder) ?? [];
     out.push(`## ${folder}`, "");
     const groups = groupBy(projects, (project) => primaryTag(project, folder));
-    const groupNames = [...groups.keys()].sort((a, b) =>
-      a === UNTAGGED ? 1 : b === UNTAGGED ? -1 : compare(a, b),
-    );
+
+    const groupNames = [...groups.keys()].toSorted(compareGroups);
+
     for (const group of groupNames) {
-      if (groupNames.length > 1) out.push(`### ${group}`, "");
+      if (groupNames.length > 1) {
+        out.push(`### ${group}`, "");
+      }
+
       out.push("| Project | Path | Description | Tags |", "| --- | --- | --- | --- |");
-      const rows = [...(groups.get(group) ?? [])].sort((a, b) => compare(a.name, b.name));
+      const rows = [...(groups.get(group) ?? [])].toSorted((a, b) => compare(a.name, b.name));
+
       for (const project of rows) {
         const card = linkTarget(path.posix.relative(indexDir, input.cardOf(project)));
         out.push(
           `| [${tableCell(project.name)}](${card}) | ${code(`${project.path}/`)} | ${tableCell(project.desc ?? "")} | ${tableCell(project.tags.join(", "))} |`,
         );
       }
+
       out.push("");
     }
   }
 
   return `${out.join("\n").trimEnd()}\n\n${manualBlock(input.manual)}\n`;
-}
+};

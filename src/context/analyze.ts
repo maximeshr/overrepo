@@ -1,4 +1,5 @@
-import { commitInfo, isGitRepo, type CommitInfo } from "../git/git.ts";
+import { commitInfo, isGitRepo } from "../git/git.ts";
+import type { CommitInfo } from "../git/git.ts";
 import type { Project } from "../core/model.ts";
 import { defaultDetectors } from "./detectors/index.ts";
 import { openRepoFiles } from "./repo-files.ts";
@@ -11,7 +12,8 @@ const AGENT_FILES = [
   ".cursorrules",
   ".github/copilot-instructions.md",
 ];
-const README_PATTERN = /^readme(\.(md|markdown|mdx|txt|rst))?$/i;
+
+const README_PATTERN = /^readme(?:\.(?:md|markdown|mdx|txt|rst))?$/iu;
 
 interface Stack {
   languages: string[];
@@ -23,71 +25,86 @@ interface Stack {
 }
 
 export interface Analysis {
+  /** Project the analysis is about */
   project: Project;
+  /** False when the project directory is not a git repository yet */
   cloned: boolean;
+  /** Languages, frameworks, tools and notes merged from every detector */
   stack: Stack;
   /** Runtime versions with the file declaring each, e.g. Node.js from `engines`, `.nvmrc`, `.node-version`. */
   runtimeVersions: VersionSpec[];
-  /** Package managers with their declared version (`undefined` when only a lockfile names them). */
+  /** Package managers with their declared version (`undefined` when only a lockfile names them) */
   packageManagerVersions: VersionSpec[];
-  /** Commit the analysis was read from (`origin/HEAD`), `undefined` when not cloned or missing. */
+  /** Commit the analysis was read from (`origin/HEAD`), `undefined` when not cloned or missing */
   lastCommit: CommitInfo | undefined;
+  /** Commands the repository defines */
   scripts: Script[];
+  /** Packages this repository publishes */
   packages: PackageId[];
+  /** Packages this repository depends on */
   dependencies: PackageId[];
+  /** Raw strings that may contain git URLs of other repositories */
   references: string[];
-  /** Top-level entries (directories end with `/`). */
+  /** Top-level entries (directories end with `/`) */
   tree: string[];
-  /** Repo-relative README path, when present. */
+  /** Repo-relative README path, when present */
   readmeFile: string | undefined;
+  /** README contents, when present */
   readme: string | undefined;
-  /** Repo-relative paths of agent instruction files present in the repo. */
+  /** Repo-relative paths of agent instruction files present in the repo */
   agentFiles: string[];
-  /** `context.include` entries present in the repo (README and agent files excluded). */
+  /** `context.include` entries present in the repo (README and agent files excluded) */
   keyFiles: string[];
 }
 
-function emptyAnalysis(project: Project, cloned: boolean): Analysis {
-  return {
-    project,
-    cloned,
-    stack: {
-      languages: [],
-      frameworks: [],
-      packageManagers: [],
-      runtimes: [],
-      tools: [],
-      notes: [],
-    },
-    runtimeVersions: [],
-    packageManagerVersions: [],
-    lastCommit: undefined,
-    scripts: [],
-    packages: [],
-    dependencies: [],
-    references: [],
-    tree: [],
-    readmeFile: undefined,
-    readme: undefined,
-    agentFiles: [],
-    keyFiles: [],
-  };
-}
+const emptyAnalysis = (project: Project, cloned: boolean): Analysis => ({
+  project,
+  cloned,
+  stack: {
+    languages: [],
+    frameworks: [],
+    packageManagers: [],
+    runtimes: [],
+    tools: [],
+    notes: [],
+  },
+  runtimeVersions: [],
+  packageManagerVersions: [],
+  lastCommit: undefined,
+  scripts: [],
+  packages: [],
+  dependencies: [],
+  references: [],
+  tree: [],
+  readmeFile: undefined,
+  readme: undefined,
+  agentFiles: [],
+  keyFiles: [],
+});
 
-function pushUnique<T>(
+const pushUnique = <T>(
   target: T[],
   values: T[] | undefined,
   key: (value: T) => string = String,
-): void {
+): void => {
   const seen = new Set(target.map(key));
+
   for (const value of values ?? []) {
-    if (seen.has(key(value))) continue;
+    if (seen.has(key(value))) {
+      continue;
+    }
+
     seen.add(key(value));
     target.push(value);
   }
-}
+};
 
-function merge(analysis: Analysis, detection: Detection): void {
+const versionKey = (spec: VersionSpec) => `${spec.name}\0${spec.source}\0${spec.version ?? ""}`;
+
+/** Ecosystems that bring a framework come first: a Laravel app with a Vite package.json is PHP before JavaScript */
+const weight = (detection: Detection) => ((detection.frameworks?.length ?? 0) > 0 ? 0 : 1);
+
+const merge = (analysis: Analysis, detection: Detection): void => {
   const { stack } = analysis;
   pushUnique(stack.languages, detection.languages);
   pushUnique(stack.frameworks, detection.frameworks);
@@ -95,65 +112,83 @@ function merge(analysis: Analysis, detection: Detection): void {
   pushUnique(stack.runtimes, detection.runtimes);
   pushUnique(stack.tools, detection.tools);
   pushUnique(stack.notes, detection.notes);
-  const versionKey = (spec: VersionSpec) => `${spec.name}\0${spec.source}\0${spec.version ?? ""}`;
   pushUnique(analysis.runtimeVersions, detection.runtimeVersions, versionKey);
   pushUnique(analysis.packageManagerVersions, detection.packageManagerVersions, versionKey);
   pushUnique(analysis.scripts, detection.scripts, (script) => `${script.runner} ${script.name}`);
   pushUnique(analysis.packages, detection.packages, (id) => `${id.ecosystem}:${id.name}`);
   pushUnique(analysis.dependencies, detection.dependencies, (id) => `${id.ecosystem}:${id.name}`);
   pushUnique(analysis.references, detection.references);
-}
+};
 
 /** Inspects a project on disk. Projects that are not cloned get an empty analysis. */
-export async function analyzeProject(
+export const analyzeProject = async (
   project: Project,
   include: string[],
   detectors: Detector[] = defaultDetectors,
   ref = "origin/HEAD",
-): Promise<Analysis> {
-  if (!isGitRepo(project.dir)) return emptyAnalysis(project, false);
+): Promise<Analysis> => {
+  if (!isGitRepo(project.dir)) {
+    return emptyAnalysis(project, false);
+  }
+
   const analysis = emptyAnalysis(project, true);
   const files = await openRepoFiles(project.dir, ref);
   analysis.tree = files.topLevel;
   analysis.lastCommit = await commitInfo(project.dir, ref);
 
-  const detections: Detection[] = [];
-  for (const detector of detectors) {
-    try {
-      const detection = await detector.detect(files);
-      if (detection) detections.push(detection);
-    } catch {
-      // A broken manifest file in one repo must not break the whole generation.
-    }
-  }
-  // Ecosystems that bring a framework come first: a Laravel app with a Vite package.json is PHP before JavaScript.
-  const weight = (detection: Detection) => ((detection.frameworks?.length ?? 0) > 0 ? 0 : 1);
-  for (const detection of detections.sort((a, b) => weight(a) - weight(b)))
+  const results = await Promise.all(
+    detectors.map(async (detector): Promise<Detection | undefined> => {
+      try {
+        return await detector.detect(files);
+      } catch {
+        // A broken manifest file in one repo must not break the whole generation
+        return undefined;
+      }
+    }),
+  );
+
+  const detections = results.filter((detection) => detection !== undefined);
+
+  for (const detection of detections.toSorted((a, b) => weight(a) - weight(b))) {
     merge(analysis, detection);
+  }
 
   const readmeFile = [
     "README.md",
-    ...files.topLevel.filter((file) => README_PATTERN.test(file)).sort(),
+    ...files.topLevel.filter((file) => README_PATTERN.test(file)).toSorted(),
   ].find((file) => files.topLevel.includes(file));
-  if (readmeFile) {
+
+  if (readmeFile !== undefined && readmeFile !== "") {
     analysis.readmeFile = readmeFile;
     analysis.readme = await files.readText(readmeFile);
   }
 
-  // Root files are matched against the (case-sensitive) listing, not the possibly case-insensitive filesystem.
+  // Root files are matched against the (case-sensitive) listing, not the possibly case-insensitive filesystem
   const present = async (file: string) =>
-    file.includes("/") ? files.exists(file) : files.topLevel.includes(file);
-  for (const file of AGENT_FILES) {
-    if (await present(file)) analysis.agentFiles.push(file);
-  }
+    file.includes("/") ? await files.exists(file) : files.topLevel.includes(file);
+
+  const agentFilesPresent = await Promise.all(AGENT_FILES.map(present));
+  analysis.agentFiles.push(
+    ...AGENT_FILES.filter((_file, index) => agentFilesPresent[index] === true),
+  );
 
   const covered = new Set(
-    [...analysis.agentFiles, ...(readmeFile ? [readmeFile] : [])].map((file) => file.toLowerCase()),
+    [
+      ...analysis.agentFiles,
+      ...(readmeFile !== undefined && readmeFile !== "" ? [readmeFile] : []),
+    ].map((file) => file.toLowerCase()),
   );
-  for (const file of include) {
-    const normalized = file.replace(/^\.\//, "");
-    if (covered.has(normalized.toLowerCase()) || README_PATTERN.test(normalized)) continue;
-    if (await present(normalized)) analysis.keyFiles.push(normalized);
-  }
+
+  const candidates = include.flatMap((file) => {
+    const normalized = file.replace(/^\.\//u, "");
+
+    return covered.has(normalized.toLowerCase()) || README_PATTERN.test(normalized)
+      ? []
+      : [normalized];
+  });
+
+  const candidatesPresent = await Promise.all(candidates.map(present));
+  analysis.keyFiles.push(...candidates.filter((_file, index) => candidatesPresent[index] === true));
+
   return analysis;
-}
+};

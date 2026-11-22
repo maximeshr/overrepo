@@ -1,42 +1,60 @@
 import { parse } from "yaml";
-import type { Detector, Script } from "../types.ts";
-import { isRecord } from "./util.ts";
+import type { Detection, Detector, Script } from "../types.ts";
+import { isObject, isRecord } from "../../core/json.ts";
 
 const MAKEFILES = ["Makefile", "makefile", "GNUmakefile"];
 
-/** Explicit, non-special targets of a Makefile (`build:`, `test: deps`), in file order. */
-function makeTargets(makefile: string): string[] {
+/** Explicit, non-special targets of a Makefile (`build:`, `test: deps`), in file order */
+const makeTargets = (makefile: string): string[] => {
   const targets: string[] = [];
+
   for (const line of makefile.split("\n")) {
-    const match = /^([A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/.exec(line);
-    const target = match?.[1];
-    if (target && !target.includes("%") && !targets.includes(target)) targets.push(target);
+    const match = /^(?<target>[A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/u.exec(line);
+    const target = match?.groups?.target;
+
+    if (
+      target !== undefined &&
+      target !== "" &&
+      !target.includes("%") &&
+      !targets.includes(target)
+    ) {
+      targets.push(target);
+    }
   }
+
   return targets;
-}
+};
 
 export const makeDetector: Detector = {
   id: "make",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const scripts: Script[] = [];
     const makefile = MAKEFILES.find((file) => files.topLevel.includes(file));
-    if (makefile) {
-      for (const name of makeTargets((await files.readText(makefile)) ?? ""))
+
+    if (makefile !== undefined && makefile !== "") {
+      for (const name of makeTargets((await files.readText(makefile)) ?? "")) {
         scripts.push({ runner: "make", name });
+      }
     }
+
     const taskfile = ["Taskfile.yml", "Taskfile.yaml"].find((file) =>
       files.topLevel.includes(file),
     );
-    if (taskfile) {
+
+    if (taskfile !== undefined && taskfile !== "") {
       try {
         const parsed: unknown = parse((await files.readText(taskfile)) ?? "");
-        if (isRecord(parsed) && isRecord(parsed.tasks)) {
-          for (const name of Object.keys(parsed.tasks)) scripts.push({ runner: "task", name });
+
+        if (isRecord(parsed) && isObject(parsed.tasks)) {
+          for (const name of Object.keys(parsed.tasks)) {
+            scripts.push({ runner: "task", name });
+          }
         }
       } catch {
-        // Ignore unparsable Taskfile.
+        // Ignore unparsable Taskfile
       }
     }
+
     return scripts.length > 0 ? { scripts } : undefined;
   },
 };

@@ -1,5 +1,7 @@
 import type { Detection, Detector } from "../types.ts";
-import { isRecord, known, stringRecord } from "./util.ts";
+import { isObject, isRecord, isString } from "../../core/json.ts";
+import { known, stringRecord } from "./util.ts";
+import type { JsonValue } from "../../core/json.ts";
 
 const FRAMEWORKS = [
   ["laravel/framework", "Laravel"],
@@ -27,54 +29,63 @@ const TOOLS = [
   ["laravel/pint", "Pint"],
 ] as const;
 
+/** `repositories` entries, whether composer.json lists them or keys them by name */
+const repositoryEntries = (repositories: JsonValue | undefined): (JsonValue | undefined)[] => {
+  if (Array.isArray(repositories)) {
+    return repositories;
+  }
+
+  return isObject(repositories) ? Object.values(repositories) : [];
+};
+
 export const phpDetector: Detector = {
   id: "php",
-  async detect(files) {
-    const composer = await files.readJson<Record<string, unknown>>("composer.json");
+  async detect(files): Promise<Detection | undefined> {
+    const composer = await files.readJson("composer.json");
+
     if (!isRecord(composer)) {
       return files.topLevel.includes("index.php") ? { languages: ["PHP"] } : undefined;
     }
+
     const require = stringRecord(composer.require);
     const deps = { ...stringRecord(composer["require-dev"]), ...require };
     const has = (name: string) => name in deps;
 
     const frameworks = known(has, FRAMEWORKS);
-    if (files.topLevel.includes("artisan") && !frameworks.includes("Laravel"))
-      frameworks.unshift("Laravel");
 
-    const repositories = Array.isArray(composer.repositories)
-      ? composer.repositories
-      : isRecord(composer.repositories)
-        ? Object.values(composer.repositories)
-        : [];
+    if (files.topLevel.includes("artisan") && !frameworks.includes("Laravel")) {
+      frameworks.unshift("Laravel");
+    }
+
+    const repositories = repositoryEntries(composer.repositories);
+    const scripts = isObject(composer.scripts) ? composer.scripts : {};
 
     const detection: Detection = {
       languages: ["PHP"],
       frameworks,
       packageManagers: ["composer"],
       tools: known(has, TOOLS),
-      scripts: Object.keys(isRecord(composer.scripts) ? composer.scripts : {})
-        .filter((name) => !/^(pre|post)-/.test(name))
-        .map((name) => {
-          const value = (composer.scripts as Record<string, unknown>)[name];
-          return {
-            runner: "composer run",
-            name,
-            cmd: typeof value === "string" ? value : undefined,
-          };
-        }),
+      scripts: Object.entries(scripts).flatMap(([name, value]) =>
+        /^(?:pre|post)-/u.test(name)
+          ? []
+          : [{ runner: "composer run", name, cmd: isString(value) ? value : undefined }],
+      ),
       dependencies: Object.keys(deps)
         .filter((name) => name.includes("/"))
         .map((name) => ({ ecosystem: "composer", name })),
       references: repositories.flatMap((repo) =>
-        isRecord(repo) && typeof repo.url === "string" ? [repo.url] : [],
+        isObject(repo) && isString(repo.url) ? [repo.url] : [],
       ),
       packages:
-        typeof composer.name === "string" && composer.name
+        isString(composer.name) && composer.name !== ""
           ? [{ ecosystem: "composer", name: composer.name }]
           : [],
     };
-    if (require.php) detection.runtimes = [`PHP ${require.php}`];
+
+    if (require.php !== undefined && require.php !== "") {
+      detection.runtimes = [`PHP ${require.php}`];
+    }
+
     return detection;
   },
 };
