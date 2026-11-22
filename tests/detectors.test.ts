@@ -5,27 +5,31 @@ import {
   versionFileValue,
 } from "../src/context/detectors/node.ts";
 import type { RepoFiles } from "../src/context/types.ts";
+import type { JsonValue } from "../src/core/json.ts";
+import { resolved } from "./helpers.ts";
 
 /** In-memory repository: keys are root-relative paths, values their contents */
 const memoryFiles = (entries: Record<string, string>): RepoFiles => {
-  const readText = async (file: string) => entries[file];
+  const readText = async (file: string) => await resolved(entries[file]);
 
   return {
     topLevel: Object.keys(entries)
       .map((file) => (file.includes("/") ? `${file.split("/")[0]}/` : file))
       .filter((file, index, all) => all.indexOf(file) === index)
       .toSorted(),
-    exists: async (file) => file in entries,
+    exists: async (file) => await resolved(file in entries),
     readText,
-    async readJson<T>(file: string) {
+    async readJson<T>(file: string): Promise<T | undefined> {
       const text = await readText(file);
 
+      // SAFETY: unchecked by design, like RepoFiles.readJson, the caller names T
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- fake of the public RepoFiles.readJson, whose caller names T
       return text === undefined ? undefined : (JSON.parse(text) as T);
     },
   };
 };
 
-const pkg = (fields: Record<string, unknown>) => JSON.stringify({ name: "app", ...fields });
+const pkg = (fields: Record<string, JsonValue>) => JSON.stringify({ name: "app", ...fields });
 
 describe(parsePackageManagerField, () => {
   it.each([

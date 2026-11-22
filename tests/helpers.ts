@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import picocolors from "picocolors";
 import { afterAll } from "vite-plus/test";
+import type { z } from "zod";
 import type { Io } from "../src/cli/io.ts";
 import { runCli } from "../src/cli/main.ts";
 
@@ -22,9 +23,15 @@ process.env.GIT_CONFIG_GLOBAL = isolatedGitConfig;
 process.env.GIT_CONFIG_NOSYSTEM = "1";
 
 // Git hooks export these (e.g. GIT_DIR in a worktree's pre-push); they would redirect every test repository.
-for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"]) {
-  delete process.env[name];
-}
+delete process.env.GIT_DIR;
+
+delete process.env.GIT_WORK_TREE;
+
+delete process.env.GIT_INDEX_FILE;
+
+delete process.env.GIT_COMMON_DIR;
+
+delete process.env.GIT_PREFIX;
 
 const tempDirs: string[] = [];
 
@@ -60,17 +67,25 @@ const writeFiles = (dir: string, files: Record<string, string>): void => {
 export const createRemote = (
   base: string,
   name: string,
-  files: Record<string, string> = { "README.md": `# ${name}\n` },
+  files?: Record<string, string>,
 ): string => {
   const dir = path.join(base, `${name}.git-src`);
   mkdirSync(dir, { recursive: true });
   git(dir, "init", "-q");
-  writeFiles(dir, files);
+  writeFiles(dir, files ?? { "README.md": `# ${name}\n` });
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "initial");
 
   return `file://${dir}`;
 };
+
+/** Resolves to `value`, for fakes of async interfaces that have nothing to wait for */
+// oxlint-disable-next-line eslint/require-await -- the fake has no I/O, yet the interface it implements is async
+export const resolved = async <T>(value: T): Promise<T> => value;
+
+/** Parses the JSON a command printed, failing the test when it does not match `schema` */
+export const parseJson = <T>(schema: z.ZodType<T>, text: string): T =>
+  schema.parse(JSON.parse(text));
 
 export interface TestRun {
   code: number;
@@ -90,7 +105,7 @@ export const cli = async (cwd: string, args: string[], stdin = ""): Promise<Test
     error: (text) => {
       err.push(text);
     },
-    readStdin: async () => stdin,
+    readStdin: async () => await resolved(stdin),
     stdinIsTTY: false,
     stdoutIsTTY: false,
     stderrIsTTY: false,

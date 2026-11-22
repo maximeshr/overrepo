@@ -31,10 +31,12 @@ projects:
     url: git@github.com:client/web.git
 `);
 
-    expect(manifest.root).toBe(path.resolve("/meta"));
-    expect(manifest.manifestDir).toBe(path.resolve("/meta"));
-    expect(manifest.summary).toMatchObject({ outDir: "context", index: "context/index.md" });
-    expect(manifest.defaults).toMatchObject({ concurrency: 8, retries: 2 });
+    expect(manifest).toMatchObject({
+      root: path.resolve("/meta"),
+      manifestDir: path.resolve("/meta"),
+      summary: { outDir: "context", index: "context/index.md" },
+      defaults: { concurrency: 8, retries: 2 },
+    });
     const [billing, web] = manifest.projects;
     expect(billing).toMatchObject({
       name: "backend/billing-api",
