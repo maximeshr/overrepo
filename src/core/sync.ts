@@ -35,7 +35,11 @@ export interface SyncReport {
 const partialCloneDir = (project: Project): string =>
   path.join(path.dirname(project.dir), `.${path.basename(project.dir)}${PARTIAL_SUFFIX}`);
 
-const isEmptyDir = async (dir: string): Promise<boolean> => (await readdir(dir)).length === 0;
+const isEmptyDir = async (dir: string): Promise<boolean> => {
+  const entries = await readdir(dir);
+
+  return entries.length === 0;
+};
 
 export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promise<SyncReport> => {
   const projects = options.projects ?? manifest.projects;

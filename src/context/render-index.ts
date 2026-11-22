@@ -18,7 +18,31 @@ export interface IndexInput {
 const TOP_LEVEL = "(top level)";
 const UNTAGGED = "other";
 
-const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const compare = (a: string, b: string): number => {
+  if (a < b) {
+    return -1;
+  }
+
+  return a > b ? 1 : 0;
+};
+
+/** Top-level projects first, then folders by name */
+const compareFolders = (a: string, b: string): number => {
+  if (a === TOP_LEVEL) {
+    return -1;
+  }
+
+  return b === TOP_LEVEL ? 1 : compare(a, b);
+};
+
+/** Groups by name, untagged projects last */
+const compareGroups = (a: string, b: string): number => {
+  if (a === UNTAGGED) {
+    return 1;
+  }
+
+  return b === UNTAGGED ? -1 : compare(a, b);
+};
 
 const folderOf = (project: Project): string => {
   const slash = project.path.indexOf("/");
@@ -44,9 +68,7 @@ const groupBy = <T>(items: T[], key: (item: T) => string): Map<string, T[]> => {
 export const renderIndex = (input: IndexInput): string => {
   const folders = groupBy(input.projects, folderOf);
 
-  const folderNames = [...folders.keys()].toSorted((a, b) =>
-    a === TOP_LEVEL ? -1 : b === TOP_LEVEL ? 1 : compare(a, b),
-  );
+  const folderNames = [...folders.keys()].toSorted(compareFolders);
 
   const indexDir = path.posix.dirname(input.index);
 
@@ -68,9 +90,7 @@ export const renderIndex = (input: IndexInput): string => {
     out.push(`## ${folder}`, "");
     const groups = groupBy(projects, (project) => primaryTag(project, folder));
 
-    const groupNames = [...groups.keys()].toSorted((a, b) =>
-      a === UNTAGGED ? 1 : b === UNTAGGED ? -1 : compare(a, b),
-    );
+    const groupNames = [...groups.keys()].toSorted(compareGroups);
 
     for (const group of groupNames) {
       if (groupNames.length > 1) {

@@ -107,7 +107,7 @@ export const summarize = (results: ProjectResult<unknown>[]): Summary => {
   const summary: Summary = { ok: 0, failed: 0, skipped: 0 };
 
   for (const result of results) {
-    summary[result.status]++;
+    summary[result.status] += 1;
   }
 
   return summary;

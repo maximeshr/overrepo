@@ -145,8 +145,10 @@ const toIssue = (
   if (issue.code === "unrecognized_keys") {
     message = `unknown key${issue.keys.length > 1 ? "s" : ""} ${issue.keys.map((key) => `"${key}"`).join(", ")}`;
 
-    if (issue.keys.length === 1) {
-      keyPath = [...issue.path, issue.keys[0]!];
+    const [key] = issue.keys;
+
+    if (issue.keys.length === 1 && key !== undefined) {
+      keyPath = [...issue.path, key];
     }
   }
 
@@ -160,8 +162,7 @@ const locateNode = (
   keyPath: PropertyKey[],
 ): Pick<ManifestIssue, "line" | "column"> => {
   for (let depth = keyPath.length; depth >= 0; depth -= 1) {
-    const node: unknown =
-      depth === 0 ? doc.contents : doc.getIn(keyPath.slice(0, depth) as unknown[], true);
+    const node: unknown = depth === 0 ? doc.contents : doc.getIn(keyPath.slice(0, depth), true);
 
     if (isNode(node) && node.range) {
       const pos = lineCounter.linePos(node.range[0]);

@@ -2,6 +2,12 @@
  * Reduces a git remote to `host/owner/repo` (lowercase, no `.git`), so that
  * `git@github.com:Org/Repo.git`, `https://github.com/org/repo` and `github:org/repo` compare equal
  */
+const SHORTHAND_HOSTS = new Map([
+  ["github", "github.com"],
+  ["gitlab", "gitlab.com"],
+  ["bitbucket", "bitbucket.org"],
+]);
+
 export const normalizeGitUrl = (input: string): string | undefined => {
   let url = input.trim();
 
@@ -15,11 +21,9 @@ export const normalizeGitUrl = (input: string): string | undefined => {
     url,
   )?.groups;
 
-  if (shorthand) {
-    const host = { github: "github.com", gitlab: "gitlab.com", bitbucket: "bitbucket.org" }[
-      shorthand.provider as "github" | "gitlab" | "bitbucket"
-    ];
+  const host = SHORTHAND_HOSTS.get(shorthand?.provider ?? "");
 
+  if (shorthand && host !== undefined) {
     return clean(`${host}/${shorthand.repo}`);
   }
 

@@ -83,13 +83,13 @@ export const execInProjects = async (
   manifest: Manifest,
   options: ExecOptions,
 ): Promise<ProjectResult<ExecValue>[]> => {
-  const [file, ...args] = typeof options.command === "string" ? [options.command] : options.command;
+  const [file, ...args] = Array.isArray(options.command) ? options.command : [options.command];
 
   if (file === undefined || file === "") {
     throw new Error("empty command");
   }
 
-  const shell = typeof options.command === "string";
+  const shell = !Array.isArray(options.command);
   const stdio = options.stdio ?? "pipe";
 
   return await forEachProject<ExecValue>(
@@ -139,10 +139,11 @@ export const execInProjects = async (
 
       const [result] = await Promise.all([child, ...streams]);
 
-      const value: ExecValue = {
-        exitCode: result.exitCode,
-        ...(options.capture === true ? { output } : {}),
-      };
+      const value: ExecValue = { exitCode: result.exitCode };
+
+      if (options.capture === true) {
+        value.output = output;
+      }
 
       if (result.isCanceled) {
         return failed("interrupted", value);

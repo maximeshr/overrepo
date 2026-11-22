@@ -31,20 +31,23 @@ export const linkTarget = (relative: string): string =>
 const neutralizeMarkers = (text: string): string =>
   text.replaceAll("overrepo:manual", "overrepo-manual");
 
-/**
- * Turns a README into a bounded excerpt that nests under a `##` heading:
- * drops front matter, HTML comments, badges and the title, demotes headings,
- * and cuts at a line boundary without leaving a code fence open
- */
-export const readmeExcerpt = (
-  readme: string,
-  maxChars: number,
-): { text: string; truncated: boolean } => {
-  if (maxChars <= 0) {
-    return { text: "", truncated: readme.trim() !== "" };
-  }
+/** A README excerpt, and whether it was cut to fit */
+interface Excerpt {
+  text: string;
+  truncated: boolean;
+}
 
-  let text = readme.replaceAll("\r\n", "\n").replace(/^﻿/u, "");
+const FENCE = /^\s*(?<marker>`{3,}|~{3,})/u;
+const BADGE_ROW = /^\s*(?:\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)\s*|!\[[^\]]*\]\([^)]*\)\s*)+$/u;
+const HEADING = /^(?<level>#{1,6})\s+(?<title>.*)$/u;
+
+/** Badge rows and lines made only of HTML tags (logos, alignment wrappers) carry no text for an agent */
+const isDecoration = (line: string): boolean =>
+  BADGE_ROW.test(line) || (line.includes("<") && line.replaceAll(/<[^>]*>/gu, "").trim() === "");
+
+/** Drops front matter, HTML comments, decorations and the title, and demotes headings */
+const cleanReadme = (readme: string): string => {
+  let text = readme.replaceAll("\r\n", "\n").replace(/^\uFEFF/u, "");
   text = text.replace(/^---\n[\s\S]*?\n---\n/u, "");
   text = text.replaceAll(/<!--[\s\S]*?-->/gu, "");
 
@@ -53,12 +56,12 @@ export const readmeExcerpt = (
   let titleDropped = false;
 
   for (const line of text.split("\n")) {
-    const marker = /^\s*(?<marker>`{3,}|~{3,})/u.exec(line)?.groups?.marker;
+    const marker = FENCE.exec(line)?.groups?.marker;
 
     if (marker !== undefined && marker !== "") {
       if (fence === undefined) {
         fence = marker;
-      } else if (marker[0] === fence[0] && marker.length >= fence.length) {
+      } else if (marker.startsWith(fence.charAt(0)) && marker.length >= fence.length) {
         fence = undefined;
       }
 
@@ -71,56 +74,50 @@ export const readmeExcerpt = (
       continue;
     }
 
-    if (/^\s*(?:\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)\s*|!\[[^\]]*\]\([^)]*\)\s*)+$/u.test(line)) {
+    if (isDecoration(line)) {
       continue;
     }
 
-    // Lines made only of HTML tags (logos, badge rows, alignment wrappers) carry no text for an agent
-    if (line.includes("<") && line.replaceAll(/<[^>]*>/gu, "").trim() === "") {
+    const heading = HEADING.exec(line)?.groups;
+
+    if (!heading) {
+      lines.push(line);
       continue;
     }
 
-    const heading = /^(?<level>#{1,6})\s+(?<title>.*)$/u.exec(line)?.groups;
-
-    if (heading) {
-      if (
-        !titleDropped &&
-        heading.level === "#" &&
-        lines.every((previous) => previous.trim() === "")
-      ) {
-        titleDropped = true;
-        continue;
-      }
-
-      lines.push(
-        `${"#".repeat(Math.min(6, (heading.level ?? "#").length + 2))} ${heading.title ?? ""}`,
-      );
+    if (
+      !titleDropped &&
+      heading.level === "#" &&
+      lines.every((previous) => previous.trim() === "")
+    ) {
+      titleDropped = true;
       continue;
     }
 
-    lines.push(line);
+    lines.push(
+      `${"#".repeat(Math.min(6, (heading.level ?? "#").length + 2))} ${heading.title ?? ""}`,
+    );
   }
 
-  const cleaned = neutralizeMarkers(lines.join("\n"))
+  return neutralizeMarkers(lines.join("\n"))
     .replaceAll(/\n{3,}/gu, "\n\n")
     .trim();
+};
 
-  if (cleaned.length <= maxChars) {
-    return { text: cleaned, truncated: false };
-  }
-
+/** Cuts at a line boundary, closing a code fence left open */
+const cutAtLine = (text: string, maxChars: number): string => {
   const kept: string[] = [];
   let size = 0;
   let open: string | undefined;
 
-  for (const line of cleaned.split("\n")) {
+  for (const line of text.split("\n")) {
     if (size + line.length + 1 > maxChars) {
       break;
     }
 
     kept.push(line);
     size += line.length + 1;
-    const marker = /^\s*(?<marker>`{3,}|~{3,})/u.exec(line)?.groups?.marker;
+    const marker = FENCE.exec(line)?.groups?.marker;
 
     if (marker !== undefined && marker !== "") {
       open = open === undefined ? marker : undefined;
@@ -136,7 +133,26 @@ export const readmeExcerpt = (
     kept.pop();
   }
 
-  return { text: kept.join("\n"), truncated: true };
+  return kept.join("\n");
+};
+
+/**
+ * Turns a README into a bounded excerpt that nests under a `##` heading:
+ * drops front matter, HTML comments, badges and the title, demotes headings,
+ * and cuts at a line boundary without leaving a code fence open
+ */
+export const readmeExcerpt = (readme: string, maxChars: number): Excerpt => {
+  if (maxChars <= 0) {
+    return { text: "", truncated: readme.trim() !== "" };
+  }
+
+  const cleaned = cleanReadme(readme);
+
+  if (cleaned.length <= maxChars) {
+    return { text: cleaned, truncated: false };
+  }
+
+  return { text: cutAtLine(cleaned, maxChars), truncated: true };
 };
 
 /** Extracts the inner content of the manual block, if any */

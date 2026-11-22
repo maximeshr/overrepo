@@ -10,6 +10,21 @@ export interface GitRunOptions {
   signal?: AbortSignal;
 }
 
+const failureReason = (
+  stderr: string,
+  details: { exitCode?: number; timedOut: boolean; aborted: boolean },
+): string => {
+  if (details.aborted) {
+    return "interrupted";
+  }
+
+  if (details.timedOut) {
+    return "timed out";
+  }
+
+  return lastMeaningfulLine(stderr) || `exited with code ${details.exitCode ?? "?"}`;
+};
+
 export class GitError extends OverrepoError {
   readonly args: string[];
   readonly stderr: string;
@@ -21,11 +36,7 @@ export class GitError extends OverrepoError {
     stderr: string,
     details: { exitCode?: number; timedOut: boolean; aborted: boolean },
   ) {
-    const reason = details.aborted
-      ? "interrupted"
-      : details.timedOut
-        ? "timed out"
-        : lastMeaningfulLine(stderr) || `exited with code ${details.exitCode ?? "?"}`;
+    const reason = failureReason(stderr, details);
 
     super(`git ${args[0] ?? ""} failed: ${reason}`);
     this.name = "GitError";
@@ -54,10 +65,9 @@ const hasCustomSshCommand = async (): Promise<boolean> => {
   sshCommandProbe ??= execa("git", ["config", "--get", "core.sshCommand"], {
     reject: false,
     stdin: "ignore",
-  }).then(
-    (result) => result.exitCode === 0 && result.stdout.trim() !== "",
-    () => false,
-  );
+  })
+    .then((result) => result.exitCode === 0 && result.stdout.trim() !== "")
+    .catch(() => false);
 
   return await sshCommandProbe;
 };
@@ -67,18 +77,22 @@ const hasCustomSshCommand = async (): Promise<boolean> => {
  * no credential prompt, and SSH in batch mode unless the user customized SSH
  */
 const nonInteractiveEnv = async (): Promise<Record<string, string>> => {
-  const env: Record<string, string> = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
+  const env = { GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "never" };
 
   if (
     (process.env.GIT_SSH_COMMAND === undefined || process.env.GIT_SSH_COMMAND === "") &&
     (process.env.GIT_SSH === undefined || process.env.GIT_SSH === "") &&
     !(await hasCustomSshCommand())
   ) {
-    env.GIT_SSH_COMMAND = "ssh -o BatchMode=yes";
+    return { ...env, GIT_SSH_COMMAND: "ssh -o BatchMode=yes" };
   }
 
   return env;
 };
+
+/** Node.js system errors name their cause in `code`, e.g. `ENOENT` */
+const hasCode = (error: unknown): error is { code: unknown } =>
+  typeof error === "object" && error !== null && "code" in error;
 
 /** Runs git and returns trimmed stdout. Throws `GitError` on failure. */
 const git = async (args: string[], options: GitRunOptions = {}): Promise<string> => {
@@ -95,10 +109,7 @@ const git = async (args: string[], options: GitRunOptions = {}): Promise<string>
   });
 
   if (result.failed) {
-    if (
-      result.code === "ENOENT" ||
-      (result.cause as NodeJS.ErrnoException | undefined)?.code === "ENOENT"
-    ) {
+    if (result.code === "ENOENT" || (hasCode(result.cause) && result.cause.code === "ENOENT")) {
       throw new OverrepoError("git executable not found in PATH", 2);
     }
 
@@ -114,7 +125,9 @@ const git = async (args: string[], options: GitRunOptions = {}): Promise<string>
 
 export const gitVersion = async (): Promise<string | undefined> => {
   try {
-    return (await git(["--version"])).replace(/^git version\s*/u, "");
+    const output = await git(["--version"]);
+
+    return output.replace(/^git version\s*/u, "");
   } catch {
     return undefined;
   }

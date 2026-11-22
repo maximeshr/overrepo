@@ -12,7 +12,11 @@ const compareEntries = (a: string, b: string): number => {
     return aDir ? -1 : 1;
   }
 
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a < b) {
+    return -1;
+  }
+
+  return a > b ? 1 : 0;
 };
 
 /**
@@ -41,17 +45,19 @@ export const openRepoFiles = async (dir: string, ref: string): Promise<RepoFiles
     topLevel,
     exists: async (file) => await gitPathExists(dir, ref, file),
     readText,
-    async readJson<T>(file: string) {
+    async readJson<T>(file: string): Promise<T | undefined> {
       const text = await readText(file);
 
       if (text === undefined) {
-        return;
+        return undefined;
       }
 
       try {
+        // SAFETY: none is checked, by contract: like JSON.parse, readJson<T> trusts the T its caller names
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- public RepoFiles API, the caller names T and validates the value
         return JSON.parse(text) as T;
       } catch {
-        return;
+        return undefined;
       }
     },
   };
