@@ -18,7 +18,7 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
   let inRequire = false;
 
   for (const raw of text.split("\n")) {
-    const line = raw.replace(/\/\/.*$/, "").trim();
+    const line = raw.replace(/\/\/.*$/u, "").trim();
 
     if (!line) {
       continue;
@@ -28,7 +28,7 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
       if (line === ")") {
         inRequire = false;
       } else {
-        const [dependency] = line.split(/\s+/);
+        const [dependency] = line.split(/\s+/u);
 
         if (dependency !== undefined && dependency !== "") {
           result.requires.push(dependency);
@@ -38,7 +38,7 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
       continue;
     }
 
-    const [directive, ...rest] = line.split(/\s+/);
+    const [directive, ...rest] = line.split(/\s+/u);
 
     if (directive === "module") {
       result.module = rest[0];
@@ -56,7 +56,7 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
   return result;
 };
 
-const stripMajor = (modulePath: string) => modulePath.replace(/\/v\d+$/, "");
+const stripMajor = (modulePath: string) => modulePath.replace(/\/v\d+$/u, "");
 
 export const goDetector: Detector = {
   id: "go",

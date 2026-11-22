@@ -48,7 +48,7 @@ const forEachLine = async (
   stream.setEncoding("utf-8");
   let pending = "";
   stream.on("data", (chunk: string) => {
-    const parts = (pending + chunk).split(/\r?\n/);
+    const parts = (pending + chunk).split(/\r?\n/u);
     pending = parts.pop() ?? "";
 
     for (const part of parts) {

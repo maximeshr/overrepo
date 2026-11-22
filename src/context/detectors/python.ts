@@ -46,7 +46,7 @@ export const pythonDetector: Detector = {
       .toLowerCase();
 
     const mentions = (name: string) =>
-      new RegExp(`(^|[^a-z0-9_-])${name}([^a-z0-9_-]|$)`, "m").test(corpus);
+      new RegExp(`(^|[^a-z0-9_-])${name}([^a-z0-9_-]|$)`, "mu").test(corpus);
 
     let manager = MANAGERS.find(([file]) => files.topLevel.includes(file))?.[1];
 
@@ -61,13 +61,14 @@ export const pythonDetector: Detector = {
       tools: known(mentions, TOOLS),
     };
 
-    const name = /^name\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
+    const name = /^name\s*=\s*["'](?<name>[^"']+)["']/mu.exec(pyproject)?.groups?.name;
 
     if (name !== undefined && name !== "") {
       detection.packages = [{ ecosystem: "pypi", name: name.toLowerCase() }];
     }
 
-    const requires = /^requires-python\s*=\s*["']([^"']+)["']/m.exec(pyproject)?.[1];
+    const requires = /^requires-python\s*=\s*["'](?<version>[^"']+)["']/mu.exec(pyproject)?.groups
+      ?.version;
 
     if (requires !== undefined && requires !== "") {
       detection.runtimes = [`Python ${requires}`];

@@ -6,7 +6,7 @@ const text = z.string().trim().min(1, "must not be empty");
 const identifier = z
   .string()
   .min(1, "must not be empty")
-  .regex(/^[^\s,]+$/, "must not contain whitespace or commas");
+  .regex(/^[^\s,]+$/u, "must not contain whitespace or commas");
 
 const projectSchema = z.strictObject({
   url: text,

@@ -4,7 +4,7 @@ import type { ProjectResult, ResultStatus } from "../core/runner.ts";
 import type { Colors, Io } from "./io.ts";
 
 // oxlint-disable-next-line no-control-regex
-const ANSI = /\u001B\[[0-9;]*m/g;
+const ANSI = /\u001B\[[0-9;]*m/gu;
 
 const visibleLength = (text: string): number => text.replaceAll(ANSI, "").length;
 

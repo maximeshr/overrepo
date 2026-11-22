@@ -183,7 +183,7 @@ const resolveFleetRoot = (
 
   const slashed = spec.trim().replaceAll("\\", "/");
 
-  if (slashed.startsWith("/") || /^[A-Za-z]:\//.test(slashed) || path.isAbsolute(spec)) {
+  if (slashed.startsWith("/") || /^[A-Za-z]:\//u.test(slashed) || path.isAbsolute(spec)) {
     return { error: `root must be relative to the manifest file, got "${spec}"` };
   }
 

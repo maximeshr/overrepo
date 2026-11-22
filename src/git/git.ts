@@ -38,13 +38,13 @@ export class GitError extends OverrepoError {
 
 const lastMeaningfulLine = (stderr: string): string => {
   const lines = stderr
-    .split(/\r?\n/)
+    .split(/\r?\n/u)
     .map((line) => line.trim())
-    .filter((line) => line !== "" && !/^(hint|warning):/i.test(line));
+    .filter((line) => line !== "" && !/^(?:hint|warning):/iu.test(line));
 
-  const fatal = lines.find((line) => /^(fatal|error):/i.test(line));
+  const fatal = lines.find((line) => /^(?:fatal|error):/iu.test(line));
 
-  return (fatal ?? lines.at(-1) ?? "").replace(/^(fatal|error):\s*/i, "");
+  return (fatal ?? lines.at(-1) ?? "").replace(/^(?:fatal|error):\s*/iu, "");
 };
 
 let sshCommandProbe: Promise<boolean> | undefined;
@@ -114,7 +114,7 @@ const git = async (args: string[], options: GitRunOptions = {}): Promise<string>
 
 export const gitVersion = async (): Promise<string | undefined> => {
   try {
-    return (await git(["--version"])).replace(/^git version\s*/, "");
+    return (await git(["--version"])).replace(/^git version\s*/u, "");
   } catch {
     return undefined;
   }
@@ -188,11 +188,11 @@ export const parseStatus = (output: string): RepoStatus => {
     } else if (line.startsWith("# branch.upstream ")) {
       status.upstream = line.slice("# branch.upstream ".length);
     } else if (line.startsWith("# branch.ab ")) {
-      const match = /\+(\d+) -(\d+)/.exec(line);
+      const counts = /\+(?<ahead>\d+) -(?<behind>\d+)/u.exec(line)?.groups;
 
-      if (match) {
-        status.ahead = Number(match[1]);
-        status.behind = Number(match[2]);
+      if (counts) {
+        status.ahead = Number(counts.ahead);
+        status.behind = Number(counts.behind);
       }
     } else if (!line.startsWith("#")) {
       status.changes += 1;
@@ -300,7 +300,7 @@ export const commitInfo = async (
     const [sha = "", iso = ""] = output.trim().split(" ");
     const time = Date.parse(iso);
 
-    if (!/^[0-9a-f]{7,}$/.test(sha) || Number.isNaN(time)) {
+    if (!/^[0-9a-f]{7,}$/u.test(sha) || Number.isNaN(time)) {
       return undefined;
     }
 

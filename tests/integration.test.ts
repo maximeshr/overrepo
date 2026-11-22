@@ -45,8 +45,8 @@ describe("sync", () => {
 
     const result = await cli(root, ["sync"]);
     expect(result.code).toBe(1);
-    expect(result.stderr).toMatch(/backend\/ghost/);
-    expect(result.stderr).toMatch(/12 ok, 1 failed, 0 skipped/);
+    expect(result.stderr).toMatch(/backend\/ghost/u);
+    expect(result.stderr).toMatch(/12 ok, 1 failed, 0 skipped/u);
 
     for (let index = 0; index < 12; index += 1) {
       const dir = path.join(
@@ -89,7 +89,7 @@ describe("sync", () => {
     const { root } = setupWorkspace(2);
     const result = await cli(root, ["sync", "--dry-run"]);
     expect(result.code).toBe(0);
-    expect(result.stderr).toMatch(/would clone/);
+    expect(result.stderr).toMatch(/would clone/u);
     expect(existsSync(path.join(root, "backend"))).toBeFalsy();
   });
 });
@@ -116,11 +116,11 @@ describe("init", () => {
 
     const init = await cli(fresh, ["init"]);
     expect(init.code).toBe(0);
-    expect(init.stderr).toMatch(/2 project/);
-    expect(init.stderr).toMatch(/tools\/local: no "origin" remote, skipped/);
+    expect(init.stderr).toMatch(/2 project/u);
+    expect(init.stderr).toMatch(/tools\/local: no "origin" remote, skipped/u);
     const text = readFileSync(path.join(fresh, "overrepo.yaml"), "utf-8");
     expect(text).toMatch(
-      /backend\/api-0:\n {4}url: .+\n {4}desc: Project 0\n {4}tags: \[ backend \]/,
+      /backend\/api-0:\n {4}url: .+\n {4}desc: Project 0\n {4}tags: \[ backend \]/u,
     );
     expect(text).not.toContain("tools/local");
 
@@ -161,7 +161,7 @@ describe("init", () => {
     expect(init.stdout).toContain("acme/collect:");
     expect(init.stdout).toContain("url: file:///collect.git");
     expect(init.stdout).toContain("t3-abc:");
-    expect(init.stdout).not.toMatch(/^ {2}\.:/m);
+    expect(init.stdout).not.toMatch(/^ {2}\.:/mu);
   });
 });
 
@@ -175,7 +175,7 @@ describe("exec and status", () => {
   it("requires a selection", async () => {
     const result = await cli(root, ["exec", "--", "git", "status"]);
     expect(result.code).toBe(2);
-    expect(result.stderr).toMatch(/no projects selected/);
+    expect(result.stderr).toMatch(/no projects selected/u);
   });
 
   it("only touches tagged projects", async () => {
@@ -211,9 +211,9 @@ describe("exec and status", () => {
     ]);
 
     expect(result.code).toBe(1);
-    expect(result.stdout).toMatch(/^backend\/api-0 +│ hi$/m);
-    expect(result.stderr).toMatch(/frontend\/web-3 .*exit code 1/);
-    expect(result.stderr).toMatch(/3 ok, 1 failed, 0 skipped/);
+    expect(result.stdout).toMatch(/^backend\/api-0 +│ hi$/mu);
+    expect(result.stderr).toMatch(/frontend\/web-3 .*exit code 1/u);
+    expect(result.stderr).toMatch(/3 ok, 1 failed, 0 skipped/u);
   });
 
   it("reports aggregated status", async () => {
@@ -443,7 +443,7 @@ describe("import", () => {
 
     expect(imported.code).toBe(0);
     const text = readFileSync(path.join(root, "overrepo.yaml"), "utf-8");
-    expect(text).toMatch(/projects:\n {2}frontend\/web:/);
+    expect(text).toMatch(/projects:\n {2}frontend\/web:/u);
     expect(text).toContain("tags: [ frontend, node ]");
     expect(text.split("\n").length).toBeGreaterThan(6);
 
@@ -495,7 +495,7 @@ describe("doctor", () => {
     expect((await cli(root, ["doctor", "--no-network"])).code).toBe(2);
     const list = await cli(root, ["list"]);
     expect(list.code).toBe(2);
-    expect(list.stderr).toMatch(/escapes the fleet root/);
+    expect(list.stderr).toMatch(/escapes the fleet root/u);
   });
 });
 
@@ -504,9 +504,9 @@ describe(cli, () => {
     const help = await cli(tempDir(), ["--help"]);
     expect(help.stdout).toContain("Usage: overrepo");
     expect(help.stdout).toContain("sync");
-    expect(help.stdout).toMatch(/\bcontext\b/);
-    expect(help.stdout).not.toMatch(/\n {2}run\b/);
-    expect((await cli(tempDir(), ["--version"])).stdout).toMatch(/^\d+\.\d+\.\d+/);
+    expect(help.stdout).toMatch(/\bcontext\b/u);
+    expect(help.stdout).not.toMatch(/\n {2}run\b/u);
+    expect((await cli(tempDir(), ["--version"])).stdout).toMatch(/^\d+\.\d+\.\d+/u);
     expect((await cli(tempDir(), ["list"])).code).toBe(2);
   });
 });

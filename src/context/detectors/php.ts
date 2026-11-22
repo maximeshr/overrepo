@@ -58,7 +58,7 @@ export const phpDetector: Detector = {
       packageManagers: ["composer"],
       tools: known(has, TOOLS),
       scripts: Object.keys(isRecord(composer.scripts) ? composer.scripts : {})
-        .filter((name) => !/^(pre|post)-/.test(name))
+        .filter((name) => !/^(?:pre|post)-/u.test(name))
         .map((name) => {
           const value = (composer.scripts as Record<string, unknown>)[name];
 

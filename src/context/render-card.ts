@@ -271,7 +271,7 @@ export const renderCard = (input: CardInput): string => {
   }
 
   if (size() > config.maxBytes) {
-    const cut = Buffer.from(body).subarray(0, config.maxBytes).toString("utf-8").replace(/�$/, "");
+    const cut = Buffer.from(body).subarray(0, config.maxBytes).toString("utf-8").replace(/�$/u, "");
     body = `${cut.slice(0, cut.lastIndexOf("\n"))}\n\n_… card truncated to ${config.maxBytes} bytes._\n`;
   }
 

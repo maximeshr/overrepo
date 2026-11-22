@@ -76,8 +76,8 @@ const runnerFor = (manager: string): string => (manager === "yarn" ? "yarn" : `$
 
 /** First non-empty line of a version file, comments removed */
 export const versionFileValue = (text: string): string | undefined => {
-  for (const line of text.split(/\r?\n/)) {
-    const value = line.replace(/#.*/, "").trim();
+  for (const line of text.split(/\r?\n/u)) {
+    const value = line.replace(/#.*/u, "").trim();
 
     if (value) {
       return value;
@@ -91,13 +91,13 @@ export const versionFileValue = (text: string): string | undefined => {
 export const parsePackageManagerField = (
   value: string,
 ): { name: string; version: string | undefined } | undefined => {
-  const match = /^([a-z]+)(?:@([^+\s]+)|$)/.exec(value.trim());
+  const groups = /^(?<name>[a-z]+)(?:@(?<version>[^+\s]+)|$)/u.exec(value.trim())?.groups;
 
-  if (match?.[1] === undefined || match?.[1] === "") {
+  if (groups?.name === undefined || groups.name === "") {
     return undefined;
   }
 
-  return { name: match[1], version: match[2] };
+  return { name: groups.name, version: groups.version };
 };
 
 /** Entries of a `devEngines` field (`runtime`, `packageManager`): one object or an array of them */

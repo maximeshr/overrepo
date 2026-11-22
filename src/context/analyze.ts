@@ -13,7 +13,7 @@ const AGENT_FILES = [
   ".github/copilot-instructions.md",
 ];
 
-const README_PATTERN = /^readme(\.(md|markdown|mdx|txt|rst))?$/i;
+const README_PATTERN = /^readme(?:\.(?:md|markdown|mdx|txt|rst))?$/iu;
 
 interface Stack {
   languages: string[];
@@ -173,7 +173,7 @@ export const analyzeProject = async (
   );
 
   for (const file of include) {
-    const normalized = file.replace(/^\.\//, "");
+    const normalized = file.replace(/^\.\//u, "");
 
     if (covered.has(normalized.toLowerCase()) || README_PATTERN.test(normalized)) {
       continue;

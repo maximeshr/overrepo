@@ -9,22 +9,24 @@ export const normalizeGitUrl = (input: string): string | undefined => {
     return undefined;
   }
 
-  url = url.replace(/^git\+/, "");
+  url = url.replace(/^git\+/u, "");
 
-  const shorthand = /^(github|gitlab|bitbucket):([^/\s]+\/[^/\s#]+)/.exec(url);
+  const shorthand = /^(?<provider>github|gitlab|bitbucket):(?<repo>[^/\s]+\/[^/\s#]+)/u.exec(
+    url,
+  )?.groups;
 
   if (shorthand) {
     const host = { github: "github.com", gitlab: "gitlab.com", bitbucket: "bitbucket.org" }[
-      shorthand[1] as "github" | "gitlab" | "bitbucket"
+      shorthand.provider as "github" | "gitlab" | "bitbucket"
     ];
 
-    return clean(`${host}/${shorthand[2]}`);
+    return clean(`${host}/${shorthand.repo}`);
   }
 
-  const scp = /^(?:[^@/\s]+@)?([^:/\s]+):(?!\/\/)(.+)$/.exec(url);
+  const scp = /^(?:[^@/\s]+@)?(?<host>[^:/\s]+):(?!\/\/)(?<repo>.+)$/u.exec(url)?.groups;
 
-  if (scp && !/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
-    return clean(`${scp[1]}/${scp[2]}`);
+  if (scp && !/^[a-z][a-z0-9+.-]*:\/\//iu.test(url)) {
+    return clean(`${scp.host}/${scp.repo}`);
   }
 
   try {
@@ -42,8 +44,8 @@ export const normalizeGitUrl = (input: string): string | undefined => {
 
 const clean = (value: string): string =>
   value
-    .replace(/#.*$/, "")
-    .replace(/\/+$/, "")
-    .replace(/\.git$/i, "")
-    .replaceAll(/\/+/g, "/")
+    .replace(/#.*$/u, "")
+    .replace(/\/+$/u, "")
+    .replace(/\.git$/iu, "")
+    .replaceAll(/\/+/gu, "/")
     .toLowerCase();

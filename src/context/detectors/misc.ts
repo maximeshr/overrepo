@@ -11,7 +11,7 @@ export const rustDetector: Detector = {
       return;
     }
 
-    const crates = (name: string) => new RegExp(`^${name}\\s*=`, "m").test(cargo);
+    const crates = (name: string) => new RegExp(`^${name}\\s*=`, "mu").test(cargo);
 
     const detection: Detection = {
       languages: ["Rust"],
@@ -22,10 +22,10 @@ export const rustDetector: Detector = {
         ["rocket", "Rocket"],
         ["tokio", "Tokio"],
       ]),
-      notes: /^\[workspace\]/m.test(cargo) ? ["Cargo workspace"] : [],
+      notes: /^\[workspace\]/mu.test(cargo) ? ["Cargo workspace"] : [],
     };
 
-    const name = /\[package\][^[]*?^name\s*=\s*"([^"]+)"/ms.exec(cargo)?.[1];
+    const name = /\[package\][^[]*?^name\s*=\s*"(?<name>[^"]+)"/msu.exec(cargo)?.groups?.name;
 
     if (name !== undefined && name !== "") {
       detection.packages = [{ ecosystem: "cargo", name }];
@@ -55,7 +55,7 @@ export const jvmDetector: Detector = {
         : "";
 
     const corpus = `${pom ?? ""}\n${gradle}`;
-    const kotlin = gradleFile === "build.gradle.kts" || /kotlin/i.test(gradle);
+    const kotlin = gradleFile === "build.gradle.kts" || /kotlin/iu.test(gradle);
 
     return {
       languages: kotlin ? ["Kotlin"] : ["Java"],
@@ -83,7 +83,7 @@ export const rubyDetector: Detector = {
       return;
     }
 
-    const gem = (name: string) => new RegExp(`^\\s*gem\\s+["']${name}["']`, "m").test(gemfile);
+    const gem = (name: string) => new RegExp(`^\\s*gem\\s+["']${name}["']`, "mu").test(gemfile);
 
     return {
       languages: ["Ruby"],
@@ -105,8 +105,8 @@ export const rubyDetector: Detector = {
 export const dotnetDetector: Detector = {
   id: "dotnet",
   async detect(files) {
-    const csharp = files.topLevel.some((file) => /\.(sln|csproj)$/i.test(file));
-    const fsharp = files.topLevel.some((file) => /\.fsproj$/i.test(file));
+    const csharp = files.topLevel.some((file) => /\.(?:sln|csproj)$/iu.test(file));
+    const fsharp = files.topLevel.some((file) => /\.fsproj$/iu.test(file));
 
     if (!csharp && !fsharp) {
       return;

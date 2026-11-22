@@ -11,11 +11,11 @@ export const normalizeRelativePath = (input: string): { path: string } | { error
     return { error: "path must not be empty" };
   }
 
-  if (slashed.startsWith("/") || /^[A-Za-z]:\//.test(slashed) || path.isAbsolute(input)) {
+  if (slashed.startsWith("/") || /^[A-Za-z]:\//u.test(slashed) || path.isAbsolute(input)) {
     return { error: `path must be relative to the fleet root, got "${input}"` };
   }
 
-  const normalized = path.posix.normalize(slashed).replace(/\/+$/, "");
+  const normalized = path.posix.normalize(slashed).replace(/\/+$/u, "");
 
   if (normalized === "." || normalized === "") {
     return { error: "path must not point to the fleet root itself" };

@@ -2,18 +2,18 @@ import { setTimeout as delay } from "node:timers/promises";
 import { GitError } from "./git.ts";
 
 const TRANSIENT_PATTERNS = [
-  /could not resolve host/i,
-  /connection (timed out|reset|refused|closed)/i,
-  /operation timed out/i,
-  /early EOF/i,
-  /RPC failed/i,
-  /the remote end hung up unexpectedly/i,
-  /unexpected disconnect/i,
-  /network is unreachable/i,
-  /temporary failure in name resolution/i,
-  /TLS|SSL_ERROR|gnutls_handshake/i,
-  /\b(429|500|502|503|504)\b/,
-  /kex_exchange_identification/i,
+  /could not resolve host/iu,
+  /connection (?:timed out|reset|refused|closed)/iu,
+  /operation timed out/iu,
+  /early EOF/iu,
+  /RPC failed/iu,
+  /the remote end hung up unexpectedly/iu,
+  /unexpected disconnect/iu,
+  /network is unreachable/iu,
+  /temporary failure in name resolution/iu,
+  /TLS|SSL_ERROR|gnutls_handshake/iu,
+  /\b(?:429|500|502|503|504)\b/u,
+  /kex_exchange_identification/iu,
 ];
 
 /** Network hiccups worth retrying; auth failures and missing repositories are not */

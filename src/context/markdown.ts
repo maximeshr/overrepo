@@ -6,7 +6,7 @@ const DEFAULT_MANUAL_BODY =
 
 /** Inline code span that survives backticks in the content */
 export const code = (text: string): string => {
-  const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+  const longest = Math.max(0, ...(text.match(/`+/gu) ?? []).map((run) => run.length));
   const fence = "`".repeat(longest + 1);
   const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
 
@@ -15,7 +15,7 @@ export const code = (text: string): string => {
 
 /** Makes a value safe for a single Markdown table cell */
 export const tableCell = (text: string): string =>
-  text.replaceAll(/\r?\n/g, " ").replaceAll("|", "\\|").trim();
+  text.replaceAll(/\r?\n/gu, " ").replaceAll("|", "\\|").trim();
 
 export const truncate = (text: string, max: number): string =>
   text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
@@ -24,7 +24,7 @@ export const truncate = (text: string, max: number): string =>
 export const linkTarget = (relative: string): string =>
   relative
     .split("/")
-    .map((segment) => encodeURIComponent(segment).replaceAll(/%2E/gi, "."))
+    .map((segment) => encodeURIComponent(segment).replaceAll(/%2E/giu, "."))
     .join("/");
 
 /** Neutralizes overrepo markers inside copied content so they cannot be mistaken for real ones */
@@ -44,20 +44,18 @@ export const readmeExcerpt = (
     return { text: "", truncated: readme.trim() !== "" };
   }
 
-  let text = readme.replaceAll("\r\n", "\n").replace(/^﻿/, "");
-  text = text.replace(/^---\n[\s\S]*?\n---\n/, "");
-  text = text.replaceAll(/<!--[\s\S]*?-->/g, "");
+  let text = readme.replaceAll("\r\n", "\n").replace(/^﻿/u, "");
+  text = text.replace(/^---\n[\s\S]*?\n---\n/u, "");
+  text = text.replaceAll(/<!--[\s\S]*?-->/gu, "");
 
   const lines: string[] = [];
   let fence: string | undefined;
   let titleDropped = false;
 
   for (const line of text.split("\n")) {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+    const marker = /^\s*(?<marker>`{3,}|~{3,})/u.exec(line)?.groups?.marker;
 
-    if (fenceMatch?.[1] !== undefined && fenceMatch?.[1] !== "") {
-      const marker = fenceMatch[1];
-
+    if (marker !== undefined && marker !== "") {
       if (fence === undefined) {
         fence = marker;
       } else if (marker[0] === fence[0] && marker.length >= fence.length) {
@@ -73,28 +71,30 @@ export const readmeExcerpt = (
       continue;
     }
 
-    if (/^\s*(\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)\s*|!\[[^\]]*\]\([^)]*\)\s*)+$/.test(line)) {
+    if (/^\s*(?:\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)\s*|!\[[^\]]*\]\([^)]*\)\s*)+$/u.test(line)) {
       continue;
     }
 
     // Lines made only of HTML tags (logos, badge rows, alignment wrappers) carry no text for an agent
-    if (line.includes("<") && line.replaceAll(/<[^>]*>/g, "").trim() === "") {
+    if (line.includes("<") && line.replaceAll(/<[^>]*>/gu, "").trim() === "") {
       continue;
     }
 
-    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    const heading = /^(?<level>#{1,6})\s+(?<title>.*)$/u.exec(line)?.groups;
 
     if (heading) {
       if (
         !titleDropped &&
-        heading[1] === "#" &&
+        heading.level === "#" &&
         lines.every((previous) => previous.trim() === "")
       ) {
         titleDropped = true;
         continue;
       }
 
-      lines.push(`${"#".repeat(Math.min(6, (heading[1] ?? "#").length + 2))} ${heading[2] ?? ""}`);
+      lines.push(
+        `${"#".repeat(Math.min(6, (heading.level ?? "#").length + 2))} ${heading.title ?? ""}`,
+      );
       continue;
     }
 
@@ -102,7 +102,7 @@ export const readmeExcerpt = (
   }
 
   const cleaned = neutralizeMarkers(lines.join("\n"))
-    .replaceAll(/\n{3,}/g, "\n\n")
+    .replaceAll(/\n{3,}/gu, "\n\n")
     .trim();
 
   if (cleaned.length <= maxChars) {
@@ -120,7 +120,7 @@ export const readmeExcerpt = (
 
     kept.push(line);
     size += line.length + 1;
-    const marker = /^\s*(`{3,}|~{3,})/.exec(line)?.[1];
+    const marker = /^\s*(?<marker>`{3,}|~{3,})/u.exec(line)?.groups?.marker;
 
     if (marker !== undefined && marker !== "") {
       open = open === undefined ? marker : undefined;
@@ -132,7 +132,7 @@ export const readmeExcerpt = (
   }
 
   // Drop trailing blank lines and headings left without their content
-  while (kept.length > 0 && /^(\s*|#{1,6}\s.*)$/.test(kept.at(-1) ?? "")) {
+  while (kept.length > 0 && /^(?:\s*|#{1,6}\s.*)$/u.test(kept.at(-1) ?? "")) {
     kept.pop();
   }
 
@@ -155,8 +155,8 @@ export const extractManual = (content: string): string | undefined => {
 
   return content
     .slice(begin + MANUAL_BEGIN.length, end)
-    .replace(/^\n/, "")
-    .replace(/\n$/, "");
+    .replace(/^\n/u, "")
+    .replace(/\n$/u, "");
 };
 
 export const manualBlock = (body: string | undefined): string =>

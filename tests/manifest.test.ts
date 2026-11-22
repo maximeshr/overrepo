@@ -104,10 +104,10 @@ projects:
   it("rejects paths escaping the fleet root", () => {
     expect(
       issuesOf("projects:\n  ../outside:\n    url: https://example.com/x.git\n")[0]?.message,
-    ).toMatch(/escapes the fleet root/);
-    expect(issuesOf("root: /tmp\nprojects: {}\n")[0]?.message).toMatch(/must be relative/);
+    ).toMatch(/escapes the fleet root/u);
+    expect(issuesOf("root: /tmp\nprojects: {}\n")[0]?.message).toMatch(/must be relative/u);
     expect(issuesOf("projects:\n  .:\n    url: https://example.com/x.git\n")[0]?.message).toMatch(
-      /fleet root itself/,
+      /fleet root itself/u,
     );
   });
 
@@ -116,7 +116,7 @@ projects:
       issuesOf(
         "projects:\n  Backend/Api:\n    url: https://example.com/a.git\n  backend/api:\n    url: https://example.com/b.git\n",
       )[0]?.message,
-    ).toMatch(/already used/);
+    ).toMatch(/already used/u);
   });
 
   it("rejects tags with commas or spaces", () => {

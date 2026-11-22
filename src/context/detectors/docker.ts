@@ -10,20 +10,22 @@ const dockerBaseImages = (dockerfile: string): string[] => {
   const images: string[] = [];
 
   for (const line of dockerfile.split("\n")) {
-    const match = /^\s*FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i.exec(line);
+    const match = /^\s*FROM\s+(?:--\S+\s+)*(?<image>\S+)(?:\s+AS\s+(?<stage>\S+))?/iu.exec(
+      line,
+    )?.groups;
 
-    if (match?.[1] === undefined || match?.[1] === "") {
+    const image = match?.image;
+
+    if (image === undefined || image === "") {
       continue;
     }
-
-    const image = match[1];
 
     if (!stages.has(image.toLowerCase()) && !images.includes(image)) {
       images.push(image);
     }
 
-    if (match[2] !== undefined && match[2] !== "") {
-      stages.add(match[2].toLowerCase());
+    if (match?.stage !== undefined && match.stage !== "") {
+      stages.add(match.stage.toLowerCase());
     }
   }
 

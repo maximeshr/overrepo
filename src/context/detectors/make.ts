@@ -9,8 +9,8 @@ const makeTargets = (makefile: string): string[] => {
   const targets: string[] = [];
 
   for (const line of makefile.split("\n")) {
-    const match = /^([A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/.exec(line);
-    const target = match?.[1];
+    const match = /^(?<target>[A-Za-z0-9][A-Za-z0-9_./-]*)\s*:(?![:=])/u.exec(line);
+    const target = match?.groups?.target;
 
     if (
       target !== undefined &&

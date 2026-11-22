@@ -28,7 +28,7 @@ export interface InitResult {
 
 const HEADER = " overrepo manifest — https://github.com/maximeshr/overrepo#manifest";
 
-const sanitizeTag = (name: string): string => name.replaceAll(/[\s,]+/g, "-");
+const sanitizeTag = (name: string): string => name.replaceAll(/[\s,]+/gu, "-");
 
 const readDescription = async (dir: string): Promise<string | undefined> => {
   for (const file of ["package.json", "composer.json"]) {

@@ -26,7 +26,7 @@ projects:
       "frontend/web",
       "backend/legacy",
     ]);
-    expect(() => names({}, true)).toThrow(/no projects selected/);
+    expect(() => names({}, true)).toThrow(/no projects selected/u);
   });
 
   it("requires every tag", () => {
@@ -48,7 +48,7 @@ projects:
       "backend/api",
       "frontend/web",
     ]);
-    expect(() => names({ projects: ["nope"] })).toThrow(/unknown project: nope/);
+    expect(() => names({ projects: ["nope"] })).toThrow(/unknown project: nope/u);
   });
 });
 

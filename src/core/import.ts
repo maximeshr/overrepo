@@ -15,11 +15,11 @@ const importProjectSchema = z.object({
   name: z
     .string()
     .min(1)
-    .regex(/^[^\s,]+$/, "must not contain whitespace or commas"),
+    .regex(/^[^\s,]+$/u, "must not contain whitespace or commas"),
   path: z.string().min(1).optional(),
   url: z.string().min(1).optional(),
   desc: z.string().optional(),
-  tags: z.array(z.string().regex(/^[^\s,]+$/)).optional(),
+  tags: z.array(z.string().regex(/^[^\s,]+$/u)).optional(),
 });
 
 export const importSourceSchema = z.union([
