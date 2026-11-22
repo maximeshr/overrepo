@@ -178,7 +178,7 @@ importers:
     dependencies:
       commander:
         specifier: ^15.0.0
-        version: 15.0.0
+        version: 15.1.0
       execa:
         specifier: ^10.1.1
         version: 10.2.1
@@ -1639,8 +1639,8 @@ packages:
     resolution: {integrity: sha512-y4Mg2tXshplEbSGzx7amzPwKKOCGuoSRP/CjEdwwk0FOGlUbq6lKuoyDZTNZkmxHdJtp54hdfY/JUrdL7Xfdug==}
     engines: {node: '>=14'}
 
-  commander@15.0.0:
-    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
     engines: {node: '>=22.12.0'}
 
   confbox@0.1.8:
@@ -4011,7 +4011,7 @@ snapshots:
 
   commander@10.0.1: {}
 
-  commander@15.0.0: {}
+  commander@15.1.0: {}
 
   confbox@0.1.8: {}
 
@@ -4931,7 +4931,7 @@ snapshots:
     dependencies:
       '@clack/prompts': 1.8.1
       cli-truncate: 6.2.0
-      commander: 15.0.0
+      commander: 15.1.0
       deepmerge: 4.3.1
       empathic: 2.1.0
       execa: 10.2.1
