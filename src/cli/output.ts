@@ -17,9 +17,9 @@ export const table = (rows: string[][], header?: string[]): string => {
   const widths: number[] = [];
 
   for (const row of all) {
-    row.forEach(
-      (cell, index) => (widths[index] = Math.max(widths[index] ?? 0, visibleLength(cell))),
-    );
+    for (const [index, cell] of row.entries()) {
+      widths[index] = Math.max(widths[index] ?? 0, visibleLength(cell));
+    }
   }
 
   return all
@@ -33,6 +33,7 @@ export const table = (rows: string[][], header?: string[]): string => {
     .join("");
 };
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- output, not input: anything JSON.stringify accepts is printed as is
 export const json = (io: Io, value: unknown): void => {
   io.write(`${JSON.stringify(value, null, 2)}\n`);
 };
@@ -63,7 +64,7 @@ export const projectColor = (colors: Colors, name: string): ((text: string) => s
   let hash = 0;
 
   for (const char of name) {
-    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+    hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 2 ** 32;
   }
 
   return palette[hash % palette.length] ?? colors.cyan;

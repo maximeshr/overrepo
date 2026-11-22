@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import { sync } from "../../core/sync.ts";
 import {
   contextOf,
@@ -35,7 +36,7 @@ export const registerSync: Register = (program, run, io) => {
       .option("-q, --quiet", "only print failures and the summary")
       .option("--json", "print results as JSON"),
   ).action(
-    run(async (options: SyncFlags, command) => {
+    run(async (options: SyncFlags, command: Command) => {
       const context = contextOf(io, command);
       const manifest = await load(context);
       const projects = select(manifest, options);

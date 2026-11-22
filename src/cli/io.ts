@@ -25,8 +25,12 @@ export interface Io {
 
 export const processIo = (signal: AbortSignal): Io => ({
   cwd: process.cwd(),
-  write: (text) => process.stdout.write(text),
-  error: (text) => process.stderr.write(text),
+  write: (text) => {
+    process.stdout.write(text);
+  },
+  error: (text) => {
+    process.stderr.write(text);
+  },
   readStdin: async () => {
     const chunks: Buffer[] = [];
 

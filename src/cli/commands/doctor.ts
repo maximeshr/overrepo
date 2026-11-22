@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import { doctor } from "../../core/doctor.ts";
 import type { CheckLevel } from "../../core/doctor.ts";
 import { contextOf, positiveNumber } from "../options.ts";
@@ -12,48 +13,57 @@ export const registerDoctor: Register = (program, run, io) => {
     .option("--timeout <seconds>", "timeout per remote check", positiveNumber, 20)
     .option("--json", "print checks as JSON")
     .action(
-      run(async (options: { network: boolean; timeout: number; json?: boolean }, command) => {
-        const context = contextOf(io, command);
+      run(
+        async (
+          options: { network: boolean; timeout: number; json?: boolean },
+          command: Command,
+        ) => {
+          const context = contextOf(io, command);
 
-        const report = await doctor({
-          cwd: context.cwd,
-          file: context.config,
-          network: options.network,
-          timeout: options.timeout,
-        });
+          const report = await doctor({
+            cwd: context.cwd,
+            file: context.config,
+            network: options.network,
+            timeout: options.timeout,
+          });
 
-        // An unusable manifest is a configuration error (2), other failures are runtime failures (1)
-        const exitCode = report.manifest ? (report.failed ? 1 : 0) : 2;
+          // An unusable manifest is a configuration error (2), other failures are runtime failures (1)
+          let exitCode = 2;
 
-        if (options.json === true) {
-          json(io, { failed: report.failed, checks: report.checks });
+          if (report.manifest) {
+            exitCode = report.failed ? 1 : 0;
+          }
+
+          if (options.json === true) {
+            json(io, { failed: report.failed, checks: report.checks });
+
+            return exitCode;
+          }
+
+          const { colors } = io;
+
+          const icons: Record<CheckLevel, string> = {
+            ok: colors.green("✔"),
+            info: colors.cyan("ℹ"),
+            warn: colors.yellow("!"),
+            fail: colors.red("✖"),
+          };
+
+          for (const check of report.checks) {
+            io.write(`${icons[check.level]} ${check.message}\n`);
+            const details = check.details ?? [];
+
+            for (const detail of details.slice(0, 20)) {
+              io.write(colors.dim(`    ${detail}\n`));
+            }
+
+            if (details.length > 20) {
+              io.write(colors.dim(`    … ${details.length - 20} more\n`));
+            }
+          }
 
           return exitCode;
-        }
-
-        const { colors } = io;
-
-        const icons: Record<CheckLevel, string> = {
-          ok: colors.green("✔"),
-          info: colors.cyan("ℹ"),
-          warn: colors.yellow("!"),
-          fail: colors.red("✖"),
-        };
-
-        for (const check of report.checks) {
-          io.write(`${icons[check.level]} ${check.message}\n`);
-          const details = check.details ?? [];
-
-          for (const detail of details.slice(0, 20)) {
-            io.write(colors.dim(`    ${detail}\n`));
-          }
-
-          if (details.length > 20) {
-            io.write(colors.dim(`    … ${details.length - 20} more\n`));
-          }
-        }
-
-        return exitCode;
-      }),
+        },
+      ),
     );
 };

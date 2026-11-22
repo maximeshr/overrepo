@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import path from "node:path";
 import { init } from "../../core/init.ts";
 import { contextOf, positiveInt } from "../options.ts";
@@ -12,32 +13,34 @@ export const registerInit: Register = (program, run, io) => {
     .option("-f, --force", "overwrite an existing overrepo.yaml")
     .option("--dry-run", "print the manifest instead of writing it")
     .action(
-      run(async (options: { depth: number; force?: boolean; dryRun?: boolean }, command) => {
-        const { cwd } = contextOf(io, command);
+      run(
+        async (options: { depth: number; force?: boolean; dryRun?: boolean }, command: Command) => {
+          const { cwd } = contextOf(io, command);
 
-        const result = await init({
-          root: cwd,
-          depth: options.depth,
-          force: options.force,
-          dryRun: options.dryRun,
-        });
+          const result = await init({
+            root: cwd,
+            depth: options.depth,
+            force: options.force,
+            dryRun: options.dryRun,
+          });
 
-        for (const warning of result.warnings) {
-          warn(io, warning);
-        }
+          for (const warning of result.warnings) {
+            warn(io, warning);
+          }
 
-        if (options.dryRun === true) {
-          io.write(result.text);
+          if (options.dryRun === true) {
+            io.write(result.text);
+
+            return 0;
+          }
+
+          io.error(
+            `${io.colors.green("✔")} wrote ${path.relative(cwd, result.file) || result.file} with ${result.projectCount} project(s)\n`,
+          );
+          io.error(io.colors.dim("next: review it, then run `overrepo sync`\n"));
 
           return 0;
-        }
-
-        io.error(
-          `${io.colors.green("✔")} wrote ${path.relative(cwd, result.file) || result.file} with ${result.projectCount} project(s)\n`,
-        );
-        io.error(io.colors.dim("next: review it, then run `overrepo sync`\n"));
-
-        return 0;
-      }),
+        },
+      ),
     );
 };

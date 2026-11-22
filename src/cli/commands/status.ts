@@ -1,8 +1,28 @@
+import type { Command } from "commander";
 import { status } from "../../core/status.ts";
+import type { RepoStatus } from "../../git/git.ts";
+import type { Colors } from "../io.ts";
 import { contextOf, load, positiveInt, select, withSelection } from "../options.ts";
 import type { SelectionOptions } from "../options.ts";
 import { json, table } from "../output.ts";
 import type { Register } from "./types.ts";
+
+const syncLabel = (colors: Colors, value: RepoStatus): string => {
+  if (value.upstream === undefined || value.upstream === "") {
+    return colors.dim("no upstream");
+  }
+
+  if (value.ahead === 0 && value.behind === 0) {
+    return colors.green("✓");
+  }
+
+  return [
+    value.ahead ? colors.yellow(`↑${value.ahead}`) : "",
+    value.behind ? colors.magenta(`↓${value.behind}`) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
 
 export const registerStatus: Register = (program, run, io) => {
   withSelection(
@@ -19,7 +39,7 @@ export const registerStatus: Register = (program, run, io) => {
     run(
       async (
         options: SelectionOptions & { concurrency?: number; dirty?: boolean; json?: boolean },
-        command,
+        command: Command,
       ) => {
         const manifest = await load(contextOf(io, command));
 
@@ -82,17 +102,7 @@ export const registerStatus: Register = (program, run, io) => {
 
           const branch = value.branch ?? colors.yellow(`detached@${value.head ?? "?"}`);
 
-          const sync =
-            value.upstream !== undefined && value.upstream !== ""
-              ? value.ahead === 0 && value.behind === 0
-                ? colors.green("✓")
-                : [
-                    value.ahead ? colors.yellow(`↑${value.ahead}`) : "",
-                    value.behind ? colors.magenta(`↓${value.behind}`) : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")
-              : colors.dim("no upstream");
+          const sync = syncLabel(colors, value);
 
           const changes =
             value.changes > 0 ? colors.red(`${value.changes} changed`) : colors.dim("clean");

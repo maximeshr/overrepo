@@ -16,8 +16,8 @@ export const runCli = async (argv: string[], io: Io): Promise<number> => {
   let exitCode = 0;
 
   const run =
-    (action: (...args: any[]) => Promise<number>) =>
-    async (...args: any[]): Promise<void> => {
+    <A extends unknown[]>(action: (...args: A) => Promise<number>) =>
+    async (...args: A): Promise<void> => {
       exitCode = await action(...args);
     };
 

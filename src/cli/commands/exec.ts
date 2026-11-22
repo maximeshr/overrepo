@@ -154,10 +154,11 @@ export const registerExec: Register = (program, run, io) => {
       .argument("<command...>", "command to run; a single quoted argument goes through the shell")
       .passThroughOptions(),
   ).action(
-    run(async (commandArgs: string[], options: ExecFlags, command) => {
+    run(async (commandArgs: string[], options: ExecFlags, command: Command) => {
       const manifest = await load(contextOf(io, command));
       const projects = select(manifest, options, true);
-      const cmd = commandArgs.length === 1 ? commandArgs[0]! : commandArgs;
+      const [single] = commandArgs;
+      const cmd = commandArgs.length === 1 && single !== undefined ? single : commandArgs;
 
       return await runInProjects(io, manifest, projects, cmd, options);
     }),

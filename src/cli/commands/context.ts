@@ -1,3 +1,4 @@
+import type { Command } from "commander";
 import { generateContext } from "../../context/generate.ts";
 import { contextOf, load, select, withSelection } from "../options.ts";
 import type { SelectionOptions } from "../options.ts";
@@ -16,7 +17,7 @@ export const registerContext: Register = (program, run, io) => {
     run(
       async (
         options: SelectionOptions & { check?: boolean; prune?: boolean; json?: boolean },
-        command,
+        command: Command,
       ) => {
         const manifest = await load(contextOf(io, command));
         const progress = progressBar(io, "analyzing");
