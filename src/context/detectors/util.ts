@@ -1,3 +1,6 @@
+import { isObject, isString } from "../../core/json.ts";
+import type { JsonValue } from "../../core/json.ts";
+
 /** Returns the labels whose key is present, in table order, without duplicates */
 export const known = (
   present: (key: string) => boolean,
@@ -14,17 +17,13 @@ export const known = (
   return labels;
 };
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-export const stringRecord = (value: unknown): Record<string, string> => {
-  if (!isRecord(value)) {
+/** The string entries of an object, none for any other value */
+export const stringRecord = (value: JsonValue | undefined): Record<string, string> => {
+  if (!isObject(value)) {
     return {};
   }
 
   return Object.fromEntries(
-    Object.entries(value).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
-    ),
+    Object.entries(value).filter((entry): entry is [string, string] => isString(entry[1])),
   );
 };

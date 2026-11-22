@@ -73,7 +73,7 @@ export const sync = async (manifest: Manifest, options: SyncOptions = {}): Promi
       await rename(partial, project.dir);
     } catch (error) {
       await rm(partial, { recursive: true, force: true }).catch(() => {
-        /* empty */
+        // Best-effort cleanup: the clone error below is the one to report
       });
       throw error;
     }

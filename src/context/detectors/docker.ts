@@ -1,6 +1,6 @@
 import { parse } from "yaml";
 import type { Detection, Detector } from "../types.ts";
-import { isRecord } from "./util.ts";
+import { isObject, isRecord } from "../../core/json.ts";
 
 const COMPOSE_FILES = ["compose.yaml", "compose.yml", "docker-compose.yml", "docker-compose.yaml"];
 
@@ -34,7 +34,7 @@ const dockerBaseImages = (dockerfile: string): string[] => {
 
 export const dockerDetector: Detector = {
   id: "docker",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const tools: string[] = [];
     const dockerfile = await files.readText("Dockerfile");
 
@@ -51,7 +51,7 @@ export const dockerDetector: Detector = {
       try {
         const compose: unknown = parse((await files.readText(composeFile)) ?? "");
 
-        if (isRecord(compose) && isRecord(compose.services)) {
+        if (isRecord(compose) && isObject(compose.services)) {
           services = Object.keys(compose.services);
         }
       } catch {
@@ -66,7 +66,7 @@ export const dockerDetector: Detector = {
     }
 
     if (tools.length === 0) {
-      return;
+      return undefined;
     }
 
     const detection: Detection = { tools };

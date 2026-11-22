@@ -1,18 +1,7 @@
 import type { Detection, Detector, RepoFiles, VersionSpec } from "../types.ts";
-import { isRecord, known, stringRecord } from "./util.ts";
-
-interface PackageJson {
-  name?: unknown;
-  scripts?: unknown;
-  dependencies?: unknown;
-  devDependencies?: unknown;
-  peerDependencies?: unknown;
-  optionalDependencies?: unknown;
-  engines?: unknown;
-  packageManager?: unknown;
-  devEngines?: unknown;
-  workspaces?: unknown;
-}
+import { isObject, isRecord, isString } from "../../core/json.ts";
+import { known, stringRecord } from "./util.ts";
+import type { JsonObject, JsonValue } from "../../core/json.ts";
 
 const FRAMEWORKS = [
   ["next", "Next.js"],
@@ -102,10 +91,10 @@ export const parsePackageManagerField = (
 
 /** Entries of a `devEngines` field (`runtime`, `packageManager`): one object or an array of them */
 const devEngineEntries = (
-  devEngines: unknown,
+  devEngines: JsonValue | undefined,
   key: "runtime" | "packageManager",
 ): { name: string; version: string | undefined }[] => {
-  if (!isRecord(devEngines)) {
+  if (!isObject(devEngines)) {
     return [];
   }
 
@@ -113,11 +102,11 @@ const devEngineEntries = (
   const entries = Array.isArray(value) ? value : [value];
 
   return entries.flatMap((entry) =>
-    isRecord(entry) && typeof entry.name === "string" && entry.name
+    isObject(entry) && isString(entry.name) && entry.name !== ""
       ? [
           {
             name: entry.name,
-            version: typeof entry.version === "string" && entry.version ? entry.version : undefined,
+            version: isString(entry.version) && entry.version !== "" ? entry.version : undefined,
           },
         ]
       : [],
@@ -126,7 +115,7 @@ const devEngineEntries = (
 
 /** Node.js versions declared by the repository, in order: engines, devEngines, version files */
 const nodeVersions = async (
-  pkg: PackageJson | undefined,
+  pkg: JsonObject | undefined,
   files: RepoFiles,
 ): Promise<VersionSpec[]> => {
   const specs: VersionSpec[] = [];
@@ -146,12 +135,14 @@ const nodeVersions = async (
     }
   }
 
-  for (const file of NODE_VERSION_FILES) {
-    if (!files.topLevel.includes(file)) {
-      continue;
-    }
+  const texts = await Promise.all(
+    NODE_VERSION_FILES.map(async (file) =>
+      files.topLevel.includes(file) ? await files.readText(file) : undefined,
+    ),
+  );
 
-    const text = await files.readText(file);
+  for (const [index, file] of NODE_VERSION_FILES.entries()) {
+    const text = texts[index];
     const version = text === undefined ? undefined : versionFileValue(text);
 
     if (version !== undefined && version !== "") {
@@ -164,12 +155,13 @@ const nodeVersions = async (
 
 /** Human label of a runtime spec, e.g. `Node >=20` (engines) or `Node 20.11.0 (.nvmrc)`. */
 const runtimeLabel = (spec: VersionSpec): string => {
-  const source =
-    spec.source === "package.json#engines.node"
-      ? ""
-      : spec.source === "package.json#devEngines.runtime"
-        ? " (devEngines)"
-        : ` (${spec.source})`;
+  let source = ` (${spec.source})`;
+
+  if (spec.source === "package.json#engines.node") {
+    source = "";
+  } else if (spec.source === "package.json#devEngines.runtime") {
+    source = " (devEngines)";
+  }
 
   return `Node ${spec.version ?? "?"}${source}`;
 };
@@ -178,13 +170,12 @@ const runtimeLabel = (spec: VersionSpec): string => {
  * Package managers declared by `packageManager` and `devEngines.packageManager`. Without a
  * declaration, the lockfile names the manager but not its version, and npm is the default.
  */
-const packageManagerVersions = (pkg: PackageJson, files: RepoFiles): VersionSpec[] => {
+const packageManagerVersions = (pkg: JsonObject, files: RepoFiles): VersionSpec[] => {
   const specs: VersionSpec[] = [];
 
-  const field =
-    typeof pkg.packageManager === "string"
-      ? parsePackageManagerField(pkg.packageManager)
-      : undefined;
+  const field = isString(pkg.packageManager)
+    ? parsePackageManagerField(pkg.packageManager)
+    : undefined;
 
   if (field) {
     specs.push({ ...field, source: "package.json#packageManager" });
@@ -207,17 +198,30 @@ const packageManagerVersions = (pkg: PackageJson, files: RepoFiles): VersionSpec
   ];
 };
 
+/** `workspaces` as an array, or the `packages` array of its object form */
+const workspacePatterns = (workspaces: JsonValue | undefined): JsonValue[] | undefined => {
+  if (Array.isArray(workspaces)) {
+    return workspaces;
+  }
+
+  if (isObject(workspaces) && Array.isArray(workspaces.packages)) {
+    return workspaces.packages;
+  }
+
+  return undefined;
+};
+
 export const nodeDetector: Detector = {
   id: "node",
-  async detect(files) {
-    const json = await files.readJson<PackageJson>("package.json");
-    const pkg = isRecord(json) ? (json as PackageJson) : undefined;
+  async detect(files): Promise<Detection | undefined> {
+    const json = await files.readJson("package.json");
+    const pkg = isRecord(json) ? json : undefined;
     const runtimeVersions = await nodeVersions(pkg, files);
 
     if (!pkg) {
       // A version file alone still tells which Node.js the repository expects (tooling, CI)
       if (runtimeVersions.length === 0) {
-        return;
+        return undefined;
       }
 
       return { runtimes: runtimeVersions.map(runtimeLabel), runtimeVersions };
@@ -250,8 +254,7 @@ export const nodeDetector: Detector = {
       })),
       dependencies: Object.keys(deps).map((name) => ({ ecosystem: "npm", name })),
       references: Object.values(deps),
-      packages:
-        typeof pkg.name === "string" && pkg.name ? [{ ecosystem: "npm", name: pkg.name }] : [],
+      packages: isString(pkg.name) && pkg.name !== "" ? [{ ecosystem: "npm", name: pkg.name }] : [],
       notes: [],
     };
 
@@ -260,15 +263,11 @@ export const nodeDetector: Detector = {
       detection.runtimeVersions = runtimeVersions;
     }
 
-    const workspaces = Array.isArray(pkg.workspaces)
-      ? pkg.workspaces
-      : isRecord(pkg.workspaces) && Array.isArray(pkg.workspaces.packages)
-        ? pkg.workspaces.packages
-        : undefined;
+    const workspaces = workspacePatterns(pkg.workspaces);
 
     if (workspaces) {
       detection.notes?.push(
-        `Monorepo (workspaces: ${workspaces.filter((w) => typeof w === "string").join(", ")})`,
+        `Monorepo (workspaces: ${workspaces.filter((w) => isString(w)).join(", ")})`,
       );
     } else if (files.topLevel.includes("pnpm-workspace.yaml")) {
       detection.notes?.push("Monorepo (pnpm workspace)");

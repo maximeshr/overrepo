@@ -54,6 +54,14 @@ const readIfExists = async (file: string): Promise<string | undefined> => {
   }
 };
 
+const byName = (a: DependencyLink, b: DependencyLink): number => {
+  if (a.name < b.name) {
+    return -1;
+  }
+
+  return a.name > b.name ? 1 : 0;
+};
+
 /** Links projects through published package names and git URLs found in dependency specs */
 const internalDependencies = (
   analyses: Analysis[],
@@ -117,9 +125,6 @@ const internalDependencies = (
       }
     }
   }
-
-  const byName = (a: DependencyLink, b: DependencyLink) =>
-    a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 
   return new Map(
     [...links].map(([name, { uses, usedBy }]) => [
@@ -189,89 +194,91 @@ export const generateContext = async (
 
   const dependencies = internalDependencies(analyses, cardOf);
 
-  const files: ContextFile[] = [];
-
   const emit = async (
     relative: string,
     render: (manual: string | undefined) => string,
     project?: string,
-  ) => {
+  ): Promise<ContextFile> => {
     const absolute = path.join(base, ...relative.split("/"));
     const existing = await readIfExists(absolute);
     const content = render(existing === undefined ? undefined : extractManual(existing));
 
     if (content === existing) {
-      files.push({ path: relative, status: "unchanged", project });
-
-      return;
+      return { path: relative, status: "unchanged", project };
     }
 
     if (options.check === true) {
-      files.push({ path: relative, status: "stale", project });
-
-      return;
+      return { path: relative, status: "stale", project };
     }
 
     await mkdir(path.dirname(absolute), { recursive: true });
     await writeFile(absolute, content);
-    files.push({ path: relative, status: existing === undefined ? "created" : "updated", project });
+
+    return { path: relative, status: existing === undefined ? "created" : "updated", project };
   };
 
   const selected = new Set((options.projects ?? manifest.projects).map((project) => project.name));
 
-  for (const analysis of analyses) {
-    if (!selected.has(analysis.project.name)) {
-      continue;
-    }
+  const files = await Promise.all(
+    analyses
+      .filter((analysis) => selected.has(analysis.project.name))
+      .map(async (analysis) => {
+        const card = cardOf(analysis.project);
+        const deps = dependencies.get(analysis.project.name) ?? { uses: [], usedBy: [] };
 
-    const card = cardOf(analysis.project);
-    const deps = dependencies.get(analysis.project.name) ?? { uses: [], usedBy: [] };
-    await emit(
-      card,
-      (manual) =>
-        renderCard({
-          analysis,
+        return await emit(
           card,
-          checkout: path.relative(base, analysis.project.dir).split(path.sep).join("/"),
-          uses: deps.uses,
-          usedBy: deps.usedBy,
-          config: summary,
-          manual,
-        }),
-      analysis.project.name,
-    );
-  }
+          (manual) =>
+            renderCard({
+              analysis,
+              card,
+              checkout: path.relative(base, analysis.project.dir).split(path.sep).join("/"),
+              uses: deps.uses,
+              usedBy: deps.usedBy,
+              config: summary,
+              manual,
+            }),
+          analysis.project.name,
+        );
+      }),
+  );
 
-  await emit(summary.index, (manual) =>
-    renderIndex({
-      projects: manifest.projects,
-      index: summary.index,
-      cardOf,
-      manifestName: path.basename(manifest.file),
-      manual,
-    }),
+  files.push(
+    await emit(summary.index, (manual) =>
+      renderIndex({
+        projects: manifest.projects,
+        index: summary.index,
+        cardOf,
+        manifestName: path.basename(manifest.file),
+        manual,
+      }),
+    ),
   );
 
   const expected = new Set([summary.index, ...manifest.projects.map(cardOf)]);
+  const listed = await listMarkdown(path.join(base, ...summary.outDir.split("/")), base);
 
-  for (const file of await listMarkdown(path.join(base, ...summary.outDir.split("/")), base)) {
-    if (expected.has(file)) {
-      continue;
-    }
+  const orphans = await Promise.all(
+    listed
+      .filter((file) => !expected.has(file))
+      .map(async (file): Promise<ContextFile | undefined> => {
+        const content = await readIfExists(path.join(base, ...file.split("/")));
 
-    const content = await readIfExists(path.join(base, ...file.split("/")));
+        if (content?.includes("generated-by: overrepo") !== true) {
+          return undefined;
+        }
 
-    if (content?.includes("generated-by: overrepo") !== true) {
-      continue;
-    }
+        if (options.prune === true && options.check !== true) {
+          await rm(path.join(base, ...file.split("/")));
 
-    if (options.prune === true && options.check !== true) {
-      await rm(path.join(base, ...file.split("/")));
-      files.push({ path: file, status: "removed" });
-    } else {
-      files.push({ path: file, status: "orphan" });
-    }
-  }
+          return { path: file, status: "removed" };
+        }
+
+        return { path: file, status: "orphan" };
+      }),
+  );
+
+  files.push(...orphans.filter((file) => file !== undefined));
 
   return {
     files,

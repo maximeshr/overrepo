@@ -1,6 +1,6 @@
 import { parse } from "yaml";
-import type { Detector, Script } from "../types.ts";
-import { isRecord } from "./util.ts";
+import type { Detection, Detector, Script } from "../types.ts";
+import { isObject, isRecord } from "../../core/json.ts";
 
 const MAKEFILES = ["Makefile", "makefile", "GNUmakefile"];
 
@@ -27,7 +27,7 @@ const makeTargets = (makefile: string): string[] => {
 
 export const makeDetector: Detector = {
   id: "make",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const scripts: Script[] = [];
     const makefile = MAKEFILES.find((file) => files.topLevel.includes(file));
 
@@ -45,7 +45,7 @@ export const makeDetector: Detector = {
       try {
         const parsed: unknown = parse((await files.readText(taskfile)) ?? "");
 
-        if (isRecord(parsed) && isRecord(parsed.tasks)) {
+        if (isRecord(parsed) && isObject(parsed.tasks)) {
           for (const name of Object.keys(parsed.tasks)) {
             scripts.push({ runner: "task", name });
           }

@@ -27,11 +27,11 @@ const MANAGERS = [
 
 export const pythonDetector: Detector = {
   id: "python",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const candidates = ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"];
 
     if (!candidates.some((file) => files.topLevel.includes(file))) {
-      return;
+      return undefined;
     }
 
     const pyproject = (await files.readText("pyproject.toml")) ?? "";

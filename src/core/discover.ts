@@ -20,12 +20,23 @@ export interface ScanResult {
   partials: string[];
 }
 
+interface Candidate {
+  /** An interrupted clone (`.name.overrepo-partial`), never descended into */
+  partial: boolean;
+  /** Absolute path of the directory entry */
+  child: string;
+  /** Resolved path, to visit a directory reached through symlinks once */
+  real: string;
+}
+
 const directoryChild = async (parent: string, entry: Dirent): Promise<string | undefined> => {
   const child = path.join(parent, entry.name);
 
   if (entry.isSymbolicLink()) {
     try {
-      if (!(await stat(child)).isDirectory()) {
+      const stats = await stat(child);
+
+      if (!stats.isDirectory()) {
         return undefined;
       }
     } catch {
@@ -55,48 +66,56 @@ export const scanRepos = async (root: string, options: ScanOptions = {}): Promis
       return;
     }
 
-    const children: string[] = [];
+    // Resolved in parallel, then checked in directory order: the first path to a directory wins
+    const candidates = await Promise.all(
+      entries.map(async (entry): Promise<Candidate | undefined> => {
+        const partial = entry.name.endsWith(PARTIAL_SUFFIX) && entry.name.startsWith(".");
 
-    for (const entry of entries) {
-      if (entry.name.endsWith(PARTIAL_SUFFIX) && entry.name.startsWith(".")) {
-        const partial = await directoryChild(dir, entry);
-
-        if (partial !== undefined && partial !== "") {
-          result.partials.push(toPosixRelative(root, partial));
+        if (!partial && (entry.name.startsWith(".") || SKIPPED_DIRS.has(entry.name))) {
+          return undefined;
         }
 
+        const child = await directoryChild(dir, entry);
+
+        if (child === undefined || child === "") {
+          return undefined;
+        }
+
+        const real = partial ? child : await realpath(child).catch(() => child);
+
+        return { partial, child, real };
+      }),
+    );
+
+    const children: string[] = [];
+
+    for (const candidate of candidates) {
+      if (candidate === undefined) {
         continue;
       }
 
-      if (entry.name.startsWith(".") || SKIPPED_DIRS.has(entry.name)) {
+      const relative = toPosixRelative(root, candidate.child);
+
+      if (candidate.partial) {
+        result.partials.push(relative);
         continue;
       }
-
-      const child = await directoryChild(dir, entry);
-
-      if (child === undefined || child === "") {
-        continue;
-      }
-
-      const relative = toPosixRelative(root, child);
 
       if (ignore.has(relative) || relative === "." || relative.startsWith("../")) {
         continue;
       }
 
-      const real = await realpath(child).catch(() => child);
-
-      if (seen.has(real)) {
+      if (seen.has(candidate.real)) {
         continue;
       }
 
-      seen.add(real);
-      children.push(child);
+      seen.add(candidate.real);
+      children.push(candidate.child);
     }
 
     await Promise.all(
       children.map(async (child) => {
-        const names = await readdir(child).catch(() => [] as string[]);
+        const names = await readdir(child).catch((): string[] => []);
 
         if (names.includes(".git")) {
           result.repos.push(toPosixRelative(root, child));

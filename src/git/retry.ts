@@ -17,17 +17,9 @@ const TRANSIENT_PATTERNS = [
 ];
 
 /** Network hiccups are worth retrying, auth failures and missing repositories are not */
-const isTransientGitError = (error: unknown): boolean => {
-  if (!(error instanceof GitError) || error.aborted) {
-    return false;
-  }
-
-  if (error.timedOut) {
-    return true;
-  }
-
-  return TRANSIENT_PATTERNS.some((pattern) => pattern.test(error.stderr));
-};
+const isTransient = (error: GitError): boolean =>
+  !error.aborted &&
+  (error.timedOut || TRANSIENT_PATTERNS.some((pattern) => pattern.test(error.stderr)));
 
 export interface RetryOptions {
   /** Retries after the first attempt, 0 to never retry */
@@ -37,7 +29,7 @@ export interface RetryOptions {
   /** Stops retrying once aborted */
   signal?: AbortSignal;
   /** Called before each retry, e.g. to clean up a partial clone. */
-  onRetry?: (error: unknown, attempt: number) => void | Promise<void>;
+  onRetry?: (error: GitError, attempt: number) => void | Promise<void>;
 }
 
 export const withRetry = async <T>(
@@ -46,22 +38,24 @@ export const withRetry = async <T>(
 ): Promise<T> => {
   const baseDelay = options.baseDelay ?? 1000;
 
-  for (let attempt = 0; ; attempt += 1) {
+  // Attempts run one after the other: each retry waits for the previous failure
+  const attempt = async (index: number): Promise<T> => {
     try {
       return await operation();
     } catch (error) {
       if (
-        attempt >= options.retries ||
-        !isTransientGitError(error) ||
+        index >= options.retries ||
+        !(error instanceof GitError) ||
+        !isTransient(error) ||
         options.signal?.aborted === true
       ) {
         throw error;
       }
 
-      await options.onRetry?.(error, attempt + 1);
-      const wait = baseDelay * 2 ** attempt * (0.75 + Math.random() * 0.5);
+      await options.onRetry?.(error, index + 1);
+      const wait = baseDelay * 2 ** index * (0.75 + Math.random() * 0.5);
       await delay(wait, undefined, { signal: options.signal }).catch(() => {
-        /* empty */
+        // An abort ends the delay early, and the check below stops the retries
       });
 
       // Re-read: the signal may have fired during the delay
@@ -70,6 +64,10 @@ export const withRetry = async <T>(
       if (signal?.aborted === true) {
         throw error;
       }
+
+      return await attempt(index + 1);
     }
-  }
+  };
+
+  return await attempt(0);
 };

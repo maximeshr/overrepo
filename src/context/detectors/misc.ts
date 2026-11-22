@@ -4,11 +4,11 @@ import { known } from "./util.ts";
 /** Rust (Cargo) */
 export const rustDetector: Detector = {
   id: "rust",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const cargo = await files.readText("Cargo.toml");
 
     if (cargo === undefined) {
-      return;
+      return undefined;
     }
 
     const crates = (name: string) => new RegExp(`^${name}\\s*=`, "mu").test(cargo);
@@ -38,7 +38,7 @@ export const rustDetector: Detector = {
 /** Java / Kotlin (Maven, Gradle) */
 export const jvmDetector: Detector = {
   id: "jvm",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const pom = await files.readText("pom.xml");
 
     const gradleFile = ["build.gradle.kts", "build.gradle"].find((file) =>
@@ -46,7 +46,7 @@ export const jvmDetector: Detector = {
     );
 
     if (pom === undefined && (gradleFile === undefined || gradleFile === "")) {
-      return;
+      return undefined;
     }
 
     const gradle =
@@ -76,11 +76,11 @@ export const jvmDetector: Detector = {
 /** Ruby (Bundler) */
 export const rubyDetector: Detector = {
   id: "ruby",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const gemfile = await files.readText("Gemfile");
 
     if (gemfile === undefined) {
-      return;
+      return undefined;
     }
 
     const gem = (name: string) => new RegExp(`^\\s*gem\\s+["']${name}["']`, "mu").test(gemfile);
@@ -104,12 +104,13 @@ export const rubyDetector: Detector = {
 /** .NET (solution or project at the root) */
 export const dotnetDetector: Detector = {
   id: "dotnet",
-  async detect(files) {
+  // oxlint-disable-next-line eslint/require-await -- Detector.detect returns a promise, and this detector only reads the listing it already has
+  async detect(files): Promise<Detection | undefined> {
     const csharp = files.topLevel.some((file) => /\.(?:sln|csproj)$/iu.test(file));
     const fsharp = files.topLevel.some((file) => /\.fsproj$/iu.test(file));
 
     if (!csharp && !fsharp) {
-      return;
+      return undefined;
     }
 
     return {
@@ -123,7 +124,7 @@ export const dotnetDetector: Detector = {
 /** Continuous integration providers */
 export const ciDetector: Detector = {
   id: "ci",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const tools: string[] = [];
 
     if (files.topLevel.includes(".github/") && (await files.exists(".github/workflows"))) {

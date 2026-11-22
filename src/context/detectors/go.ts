@@ -12,9 +12,15 @@ const FRAMEWORKS = [
   ["github.com/spf13/cobra", "Cobra"],
 ] as const;
 
+interface GoMod {
+  module?: string;
+  go?: string;
+  requires: string[];
+}
+
 /** Parses the `module`, `go` and `require` directives of a go.mod file */
-const parseGoMod = (text: string): { module?: string; go?: string; requires: string[] } => {
-  const result: { module?: string; go?: string; requires: string[] } = { requires: [] };
+const parseGoMod = (text: string): GoMod => {
+  const result: GoMod = { requires: [] };
   let inRequire = false;
 
   for (const raw of text.split("\n")) {
@@ -38,17 +44,17 @@ const parseGoMod = (text: string): { module?: string; go?: string; requires: str
       continue;
     }
 
-    const [directive, ...rest] = line.split(/\s+/u);
+    const [directive, argument] = line.split(/\s+/u);
 
     if (directive === "module") {
-      result.module = rest[0];
+      result.module = argument;
     } else if (directive === "go") {
-      result.go = rest[0];
+      result.go = argument;
     } else if (directive === "require") {
-      if (rest[0] === "(") {
+      if (argument === "(") {
         inRequire = true;
-      } else if (rest[0] !== undefined && rest[0] !== "") {
-        result.requires.push(rest[0]);
+      } else if (argument !== undefined && argument !== "") {
+        result.requires.push(argument);
       }
     }
   }
@@ -60,11 +66,11 @@ const stripMajor = (modulePath: string) => modulePath.replace(/\/v\d+$/u, "");
 
 export const goDetector: Detector = {
   id: "go",
-  async detect(files) {
+  async detect(files): Promise<Detection | undefined> {
     const text = await files.readText("go.mod");
 
     if (text === undefined) {
-      return;
+      return undefined;
     }
 
     const mod = parseGoMod(text);

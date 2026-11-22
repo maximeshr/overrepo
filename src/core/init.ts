@@ -5,6 +5,7 @@ import { Document, isMap, isSeq } from "yaml";
 import { originUrl } from "../git/git.ts";
 import { scanRepos } from "./discover.ts";
 import { ManifestError, OverrepoError } from "./errors.ts";
+import { isRecord, isString } from "./json.ts";
 import { parseManifest } from "./manifest.ts";
 import { MANIFEST_FILES } from "./model.ts";
 
@@ -31,26 +32,43 @@ const HEADER = " overrepo manifest — https://github.com/maximeshr/overrepo#man
 
 const sanitizeTag = (name: string): string => name.replaceAll(/[\s,]+/gu, "-");
 
-const readDescription = async (dir: string): Promise<string | undefined> => {
-  for (const file of ["package.json", "composer.json"]) {
-    try {
-      const json = JSON.parse(await readFile(path.join(dir, file), "utf-8")) as {
-        description?: unknown;
-      };
+interface ScannedProject {
+  url: string;
+  desc?: string;
+  tags?: string[];
+}
 
-      if (typeof json.description === "string" && json.description.trim()) {
-        return json.description.trim();
-      }
-    } catch {
-      // Missing or invalid file: no description
+interface ScannedManifest {
+  projects: Record<string, ScannedProject>;
+}
+
+const descriptionIn = async (file: string): Promise<string | undefined> => {
+  try {
+    const json: unknown = JSON.parse(await readFile(file, "utf-8"));
+
+    if (isRecord(json) && isString(json.description) && json.description.trim() !== "") {
+      return json.description.trim();
     }
+  } catch {
+    // Missing or invalid file: no description
   }
 
   return undefined;
 };
 
+/** The first description found, package.json first */
+const readDescription = async (dir: string): Promise<string | undefined> => {
+  const descriptions = await Promise.all(
+    ["package.json", "composer.json"].map(
+      async (file) => await descriptionIn(path.join(dir, file)),
+    ),
+  );
+
+  return descriptions.find((description) => description !== undefined);
+};
+
 /** Builds the manifest document with flow-style tag lists and a header comment */
-const createManifestDocument = (manifest: Record<string, unknown>): Document => {
+const createManifestDocument = (manifest: ScannedManifest): Document => {
   const doc = new Document(manifest);
   doc.commentBefore = HEADER;
   const projects = doc.get("projects");
@@ -78,9 +96,9 @@ const scanManifest = async (
   root: string,
   depth: number | undefined,
   warnings: string[],
-): Promise<Record<string, unknown>> => {
+): Promise<ScannedManifest> => {
   const { repos } = await scanRepos(root, { maxDepth: depth });
-  const projects: Record<string, Record<string, unknown>> = {};
+  const projects: Record<string, ScannedProject> = {};
 
   const details = await Promise.all(
     repos.map(async (repo) => {
@@ -96,7 +114,7 @@ const scanManifest = async (
       continue;
     }
 
-    const project: Record<string, unknown> = { url };
+    const project: ScannedProject = { url };
 
     if (desc !== undefined && desc !== "") {
       project.desc = desc;
@@ -156,9 +174,7 @@ export const init = async (options: InitOptions): Promise<InitResult> => {
     await writeFile(file, text);
   }
 
-  const projectCount = Object.keys(
-    (manifest.projects as Record<string, unknown> | undefined) ?? {},
-  ).length;
+  const projectCount = Object.keys(manifest.projects).length;
 
   return { file, text, projectCount, warnings, written: options.dryRun !== true };
 };

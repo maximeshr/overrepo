@@ -99,6 +99,11 @@ const pushUnique = <T>(
   }
 };
 
+const versionKey = (spec: VersionSpec) => `${spec.name}\0${spec.source}\0${spec.version ?? ""}`;
+
+/** Ecosystems that bring a framework come first: a Laravel app with a Vite package.json is PHP before JavaScript */
+const weight = (detection: Detection) => ((detection.frameworks?.length ?? 0) > 0 ? 0 : 1);
+
 const merge = (analysis: Analysis, detection: Detection): void => {
   const { stack } = analysis;
   pushUnique(stack.languages, detection.languages);
@@ -107,7 +112,6 @@ const merge = (analysis: Analysis, detection: Detection): void => {
   pushUnique(stack.runtimes, detection.runtimes);
   pushUnique(stack.tools, detection.tools);
   pushUnique(stack.notes, detection.notes);
-  const versionKey = (spec: VersionSpec) => `${spec.name}\0${spec.source}\0${spec.version ?? ""}`;
   pushUnique(analysis.runtimeVersions, detection.runtimeVersions, versionKey);
   pushUnique(analysis.packageManagerVersions, detection.packageManagerVersions, versionKey);
   pushUnique(analysis.scripts, detection.scripts, (script) => `${script.runner} ${script.name}`);
@@ -132,22 +136,18 @@ export const analyzeProject = async (
   analysis.tree = files.topLevel;
   analysis.lastCommit = await commitInfo(project.dir, ref);
 
-  const detections: Detection[] = [];
-
-  for (const detector of detectors) {
-    try {
-      const detection = await detector.detect(files);
-
-      if (detection) {
-        detections.push(detection);
+  const results = await Promise.all(
+    detectors.map(async (detector): Promise<Detection | undefined> => {
+      try {
+        return await detector.detect(files);
+      } catch {
+        // A broken manifest file in one repo must not break the whole generation
+        return undefined;
       }
-    } catch {
-      // A broken manifest file in one repo must not break the whole generation
-    }
-  }
+    }),
+  );
 
-  // Ecosystems that bring a framework come first: a Laravel app with a Vite package.json is PHP before JavaScript
-  const weight = (detection: Detection) => ((detection.frameworks?.length ?? 0) > 0 ? 0 : 1);
+  const detections = results.filter((detection) => detection !== undefined);
 
   for (const detection of detections.toSorted((a, b) => weight(a) - weight(b))) {
     merge(analysis, detection);
@@ -167,11 +167,10 @@ export const analyzeProject = async (
   const present = async (file: string) =>
     file.includes("/") ? await files.exists(file) : files.topLevel.includes(file);
 
-  for (const file of AGENT_FILES) {
-    if (await present(file)) {
-      analysis.agentFiles.push(file);
-    }
-  }
+  const agentFilesPresent = await Promise.all(AGENT_FILES.map(present));
+  analysis.agentFiles.push(
+    ...AGENT_FILES.filter((_file, index) => agentFilesPresent[index] === true),
+  );
 
   const covered = new Set(
     [
@@ -180,17 +179,16 @@ export const analyzeProject = async (
     ].map((file) => file.toLowerCase()),
   );
 
-  for (const file of include) {
+  const candidates = include.flatMap((file) => {
     const normalized = file.replace(/^\.\//u, "");
 
-    if (covered.has(normalized.toLowerCase()) || README_PATTERN.test(normalized)) {
-      continue;
-    }
+    return covered.has(normalized.toLowerCase()) || README_PATTERN.test(normalized)
+      ? []
+      : [normalized];
+  });
 
-    if (await present(normalized)) {
-      analysis.keyFiles.push(normalized);
-    }
-  }
+  const candidatesPresent = await Promise.all(candidates.map(present));
+  analysis.keyFiles.push(...candidates.filter((_file, index) => candidatesPresent[index] === true));
 
   return analysis;
 };

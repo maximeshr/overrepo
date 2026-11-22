@@ -137,10 +137,10 @@ export const progressBar = (io: Io, title: string, width = 24): ProgressBar => {
   if (!io.stderrIsTTY) {
     return {
       update: () => {
-        /* empty */
+        // Redrawing in place only works on a terminal
       },
       clear: () => {
-        /* empty */
+        // Nothing was drawn
       },
     };
   }
